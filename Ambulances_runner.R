@@ -133,8 +133,8 @@ TestFun   = Build_Ambulance_Testfun(BOseed, numtestseeds=10000, runlength=1)[[1]
 XRAN      = matrix(c(0,20), 2, dims)
 
 
-Budget0   = 200
-Budget1   = 500
+Budget0   = 20
+Budget1   = 25
 
 cat("TestFun Ambulance, method ", method_names[method], ", seed ", BOseed, "\n")
 
