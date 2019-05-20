@@ -21,4 +21,4 @@ ADD RUN_ATO.sh /
 
 ADD RUN_AMBULANCES.sh /
 
-ADD CRN/ /
+ADD ./* /
