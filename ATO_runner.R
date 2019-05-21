@@ -10,8 +10,9 @@ if(!debug)cat(CPU,"\n\n", commandArgs(), "\n\n")
 
 
 if(debug){
-  dead = if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/") else setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/")
-} else {
+  if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/")
+  else if (grepl("Book", CPU)) setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/")
+  else setwd("/Users/pearce/CRN/")
   cat(getwd(),"\n\n")
   # system("cp ../CRNMay2018.R ./", wait=T)
 }
@@ -45,7 +46,7 @@ method_names = c("UNI MLE",
 if(length(Args)>0){
   
   reps = 400
-  Methods = rep(c(2, 4, 5, 6, 7), each=reps)
+  Methods = rep(c(4, 5, 6, 7), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   Ns0 = 5
   
@@ -194,7 +195,7 @@ cat("\n\nReady to Rock and Roll!\n\n")
 
 while(length(GP1$yd)<Budget1){
   
-  
+  cat("Selecting point: ", length(GP1$yd)+1, "\n")
   if(method == 1){
     # iid uniform
     Budget = length(GP1$yd) + 1
@@ -211,16 +212,22 @@ while(length(GP1$yd)<Budget1){
     
     # Sequential methods
     Xr = Build_ref_X(GP1, T)
-    
+    max_seed = max(GP1$xd[,GP1$dims+1])
     
     if(method==2){
-      newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, all_seeds=F, maxevals=20)
+      newx = MCMC_CRNKG_grad(list(GP1), check_Seeds=max_seed, Xr=Xr,
+                             N0=1000, Na=5, maxevals=20)
       
     }else if(method==4 | method==6){
-      newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, all_seeds=T, maxevals=20, S0=1)
+      
+      check_seeds = sample(max_seed)[1:5]
+      newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, check_Seeds=check_seeds,
+                             N0=1000, Na=5, maxevals=20)
       
     }else if(method==5 | method==7){
-      newx = MCMC_PWKG_grad(list(GP1), Xr=Xr, maxevals=20, ratio = 1)
+      newx = MCMC_PWKG_grad(list(GP1), Xr=Xr,
+                            N0=1000, Na=5, maxevals=20, 
+                            PN0=4000, PNa=20, Pmaxevals=40)
       
     }
     

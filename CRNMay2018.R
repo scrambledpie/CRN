@@ -275,6 +275,9 @@ Optimizer_3  = function(f1, df1, ran, Ns=40, x0=NULL, debugging=F, reltol=1e-8, 
 
 Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, reltol=1e-8, maxevals=Inf){
   
+  
+  cat("\n Na:", Na, ", N0: ", N0, ", maxevals: ",maxevals)
+  # browser()
   # Function that maximizes f1 and returns argmax
   # 
   # Args
@@ -2567,14 +2570,16 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
   return(list(KG=KG, dKG=dKG, PWKG=PWKG, dPWKG=dPWKG, best_x=best_x))
 }
 
-MCMC_PWKG_grad = function(CRNGPs, Xr, ratio=1, with_pairs=T, optim_N0=1000, ...){
+MCMC_PWKG_grad = function(CRNGPs, Xr, ratio=1, 
+                          N0=1000, Na=1, maxevals=50, 
+                          PN0=4000, PNa=4, Pmaxevals=100){
   
   stopifnot(
     typeof(CRNGPs)=="list",
     ncol(Xr)==CRNGPs[[1]]$dims+1
   )
   
-  cat("optim PWKG_grad with pairs ", with_pairs, ", ...")
+  cat("optim PWKG_grad with pairs, ...")
   topKG = -Inf
   topxs = 0
   topPW = FALSE
@@ -2670,11 +2675,16 @@ MCMC_PWKG_grad = function(CRNGPs, Xr, ratio=1, with_pairs=T, optim_N0=1000, ...)
 
   # A = EI_optimizer(PWKG, cbind(CRNGPs[[1]]$XRAN, CRNGPs[[1]]$XRAN))
   
-  A = Optimizer_2(KG, dKG, CRNGPs[[1]]$XRAN, N0=optim_N0, ...)
-  # browser()
-  if(with_pairs){
-    A = Optimizer_2(PWKG, dPWKG, cbind(CRNGPs[[1]]$XRAN, CRNGPs[[1]]$XRAN), N0=optim_N0, ...)
-  }
+  A = Optimizer_2(KG, dKG, CRNGPs[[1]]$XRAN,
+                  N0=N0,
+                  Na=Na,
+                  maxevals=maxevals)
+
+  A = Optimizer_2(PWKG, dPWKG, cbind(CRNGPs[[1]]$XRAN, CRNGPs[[1]]$XRAN),
+                  N0 = PN0,
+                  Na = PNa,
+                  maxevals = Pmaxevals)
+
   
   topxs = FUNS$best_x()
   
@@ -2785,25 +2795,20 @@ Make_CRNKG_grad = function(CRNGP, Xr){
   return(list(KG=CRNKG, dKG=dCRNKG))
 }
 
-MCMC_CRNKG_grad = function(CRNGPs, Xr, all_seeds=F, S0=1, optim_N0=1000,...){
-  cat("optim CRNKG_grad, all seeds:", all_seeds, "...")
+MCMC_CRNKG_grad = function(CRNGPs, Xr, check_Seeds=NULL,
+                           N0=1000, Na=1, maxevals=50){
+  
+  dims = CRNGPs[[1]]$dims
+  
+  if(is.null(check_Seeds)) check_Seeds = max(CRNGPs[[1]]$xd[,dims+1])
+  
+  cat("optim CRNKG_grad, check seeds:", check_Seeds, "...")
   
   # Check reference points and remove repeats
   Xr = Check_ref_X(Xr, CRNGPs[[1]]$dims, T, "CRNKG Xr")
   
   topKG = -Inf
   topxs = 0
-  
-  if(!all_seeds){
-    check_seeds = max(CRNGPs[[1]]$xd[,ncol(CRNGPs[[1]]$xd)]) +1
-  }else{
-    top_seed = (max(CRNGPs[[1]]$xd[,ncol(CRNGPs[[1]]$xd)])+1)
-    S0 = max(S0,1)
-    S0 = min(S0, top_seed)
-    check_seeds = S0:top_seed
-    # check_seeds = sample(1:top_seed, size = min(10, top_seed), top_seed)
-  }
-  
   
   if(length(CRNGPs)==1){
     KG_FUNS = Make_CRNKG_grad(CRNGPs[[1]], Xr)
@@ -2854,12 +2859,13 @@ MCMC_CRNKG_grad = function(CRNGPs, Xr, all_seeds=F, S0=1, optim_N0=1000,...){
   # plot(c(0,100), range(KG_i), col="white")
   # BB = sapply(check_seeds, function(s)lines(1:99, KG_i[,s], col=s+1))
   
-  for(s in check_seeds){
+  for(s in check_Seeds){
     KGs = function(x)KG(c(x,s))
     dKGs = function(x)dKG(c(x,s))
-    N0 = 50
-    Na = 1
-    dead = Optimizer_2(KGs, dKGs, ran=CRNGPs[[1]]$XRAN, N0=optim_N0, ...)
+    dead = Optimizer_2(KGs, dKGs, ran=CRNGPs[[1]]$XRAN,
+                       N0=N0,
+                       Na=Na,
+                       maxevals=maxevals)
   }
   
   # cat("best KG ", topxs, "\t", topKG,"\t", max(KG_i), "\n")
