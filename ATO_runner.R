@@ -135,7 +135,7 @@ XRAN      = matrix(c(0,20), 2, dims)
 
 
 Budget0   = 20
-Budget1   = 25
+Budget1   = 500
 
 cat("TestFun Ambulance, method ", method_names[method], ", seed ", BOseed, "\n")
 
