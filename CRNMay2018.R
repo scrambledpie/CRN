@@ -2040,6 +2040,8 @@ Build_ref_X = function(GP, rounding=F){
   xd   = GP$xd
   XRAN = GP$XRAN
   
+ 
+  
   xd = xd[,1:ncol(XRAN)]
   xd = Check_X(xd, ncol(XRAN), F, "Xr builder1")
   

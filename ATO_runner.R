@@ -49,8 +49,11 @@ if(length(Args)>0){
   Methods = rep(c(4, 5, 6, 7), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   Ns0 = 5
-  
-  myID = as.numeric(Args[1]) 
+
+  set.seed(1)
+  JOBS = sample(length(Methods))
+
+  myID = JOBS[as.numeric(Args[1])] 
   
   method = Methods[myID]
   BOseed = BOseeds[myID]
@@ -58,8 +61,8 @@ if(length(Args)>0){
 }else{
   
   cat("Running locally \n")
-  method = 5
-  BOseed = 399
+  method = 4
+  BOseed = 1
   myID   = 1199
   Ns0    = 5
 }
@@ -137,7 +140,7 @@ XRAN      = matrix(c(0,20), 2, dims)
 Budget0   = 20
 Budget1   = 500
 
-cat("TestFun Ambulance, method ", method_names[method], ", seed ", BOseed, "\n")
+cat("TestFun ATO, method ", method_names[method], ", seed ", BOseed, "\n")
 
 ################################################################################################
 ################################################################################################
@@ -152,6 +155,7 @@ t0 = proc.time()[3]
 XX   = UniformDesign_X(N0=Budget0, ran=XRAN, Ns=Ns0, TestFun=NULL, rounding=T, double=0) 
 YY   = TestFun(XX)
 eval_time = proc.time()[3] - t0
+
 
 if(method%in%c(1, 2))  XX[,ncol(XX)] = 1:nrow(XX)
 
@@ -212,15 +216,15 @@ while(length(GP1$yd)<Budget1){
     
     # Sequential methods
     Xr = Build_ref_X(GP1, T)
-    max_seed = max(GP1$xd[,GP1$dims+1])
+    new_seed = max(GP1$xd[,GP1$dims+1]) + 1
     
     if(method==2){
-      newx = MCMC_CRNKG_grad(list(GP1), check_Seeds=max_seed, Xr=Xr,
+      newx = MCMC_CRNKG_grad(list(GP1), check_Seeds=new_seed, Xr=Xr,
                              N0=1000, Na=5, maxevals=20)
       
     }else if(method==4 | method==6){
       
-      check_seeds = sample(max_seed)[1:5]
+      check_seeds = sample(new_seed)[1:min(5, new_seed)]
       newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, check_Seeds=check_seeds,
                              N0=1000, Na=5, maxevals=20)
       
