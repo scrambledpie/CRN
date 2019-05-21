@@ -24,33 +24,33 @@ CPU = system("hostname",intern=T)
 # if (grepl("Book", CPU)){
 if (F){
   Check_X = function(x, dims, withseeds, fname){
-  # Args
-  #   x: input vec or matrix
-  #   dims: number of continuous dims of x
-  #   withseeds: should the x include an integer seed aslast element
-  #   fname: printed with the error message
-  #
-  # Returns
-  #   x: correctly formatted as a matrix
-  
-  dimsN = dims + withseeds
-  
-  if (dims==1&is.null(dim(x))&!withseeds){ cat(fname, "converting x to matrix"); x = matrix(x, ncol=1)}
-  
-  if (length(x)==dimsN & length(dim(x))==0){ cat(fname, "converting x to matrix"); x = matrix(x, ncol=dimsN, nrow=1)}
-  
-  if (length(x)%%dimsN!=0) stop(fname, " wrong length input, got ", length(x))
-  
-  if (length(dim(x))!=2) stop(fname, "wrong input dim, got ", dim(x))
-  
-  if (ncol(x)!=dimsN) stop(fname, "wrong # input columns, got ", ncol(x))
-  
-  if (withseeds & !all(x[,dimsN]%%1==0)) stop(fname, "non-integer seeds not allowed")
-  
-  if (withseeds & !all(x[,dimsN]>=0)) stop(fname, "negative seeds not allowed")
-  
-  x
-}
+    # Args
+    #   x: input vec or matrix
+    #   dims: number of continuous dims of x
+    #   withseeds: should the x include an integer seed aslast element
+    #   fname: printed with the error message
+    #
+    # Returns
+    #   x: correctly formatted as a matrix
+    
+    dimsN = dims + withseeds
+    
+    if (dims==1&is.null(dim(x))&!withseeds){ cat(fname, "converting x to matrix"); x = matrix(x, ncol=1)}
+    
+    if (length(x)==dimsN & length(dim(x))==0){ cat(fname, "converting x to matrix"); x = matrix(x, ncol=dimsN, nrow=1)}
+    
+    if (length(x)%%dimsN!=0) stop(fname, " wrong length input, got ", length(x))
+    
+    if (length(dim(x))!=2) stop(fname, "wrong input dim, got ", dim(x))
+    
+    if (ncol(x)!=dimsN) stop(fname, "wrong # input columns, got ", ncol(x))
+    
+    if (withseeds & !all(x[,dimsN]%%1==0)) stop(fname, "non-integer seeds not allowed")
+    
+    if (withseeds & !all(x[,dimsN]>=0)) stop(fname, "negative seeds not allowed")
+    
+    x
+  }
 }else{
   Check_X = function(x, dims, withseeds, fname) x
 }

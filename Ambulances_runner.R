@@ -10,11 +10,12 @@ if(!debug)cat(CPU,"\n\n", commandArgs(), "\n\n")
 
 
 if(debug){
-  dead = if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/") else setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/")
-} else {
-  cat(getwd(),"\n\n")
-  # system("cp ../CRNMay2018.R ./", wait=T)
+  if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/")
+  else if (grepl("Book", CPU)) setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/")
+  else setwd("/Users/pearce/CRN/")
 }
+
+cat(getwd(),"\n\n")
 
 
 source('CRNMay2018.R')
@@ -211,14 +212,23 @@ while(length(GP1$yd)<Budget1){
     
     t0 = proc.time()[3]
     Xr = Build_ref_X(GP1, T)
-    
+    max_seed = max(GP1$xd[,GP1$dims+1])
     
     if(method==2){
-      newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, all_seeds=F, maxevals=20)
+      newx = MCMC_CRNKG_grad(list(GP1), check_Seeds=max_seed, Xr=Xr,
+                             N0=1000, Na=5, maxevals=20)
+      
     }else if(method==4 | method==6){
-      newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, all_seeds=T, maxevals=20, S0=1)
+      
+      check_seeds = sample(max_seed)[1:5]
+      newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, check_Seeds=check_seeds,
+                             N0=1000, Na=5, maxevals=20)
+      
     }else if(method==5 | method==7){
-      newx = MCMC_PWKG_grad(list(GP1), Xr=Xr, maxevals=20, ratio = 1)
+      newx = MCMC_PWKG_grad(list(GP1), Xr=Xr,
+                            N0=1000, Na=5, maxevals=20, 
+                            PN0=4000, PNa=20, Pmaxevals=40)
+      
     }
     KG_time = proc.time()[3]-t0
     
