@@ -219,17 +219,17 @@ while(length(GP1$yd)<Budget1){
     
     if(method==2){
       newx = MCMC_CRNKG_grad(list(GP1), check_Seeds=new_seed, Xr=Xr,
-                             N0=1000, Na=10, maxevals=100)
+                             N0=2000, Na=10, maxevals=100)
       
     }else if(method==4 | method==6){
       check_seeds = sort(sample(new_seed)[1:min(new_seed, 5)])
       newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, check_Seeds=check_seeds,
-                             N0=1000, Na=10, maxevals=100)
+                             N0=2000, Na=10, maxevals=100)
       
     }else if(method==5 | method==7){
       newx = MCMC_PWKG_grad(list(GP1), Xr=Xr,
-                            N0=1000, Na=10, maxevals=100, 
-                            PN0=4000, PNa=20, Pmaxevals=200)
+                            N0=2000, Na=10, maxevals=100, 
+                            PN0=8000, PNa=20, Pmaxevals=200)
       
     }
     KG_time = proc.time()[3]-t0
