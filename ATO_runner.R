@@ -46,7 +46,7 @@ method_names = c("UNI MLE",
 if(length(Args)>0){
   
   reps = 400
-  Methods = rep(c(1, 4, 5, 6, 7), each=reps)
+  Methods = rep(c(2, 4, 5, 6, 7), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   Ns0 = 5
 
@@ -61,7 +61,7 @@ if(length(Args)>0){
 }else{
   
   cat("Running locally \n")
-  method = 5
+  method = 2
   BOseed = 1
   myID   = 1199
   Ns0    = 5
