@@ -1856,7 +1856,6 @@ EI_optimizer = function(EIfun, ran, Ns=50){
       # x1 = Check_X(x1, self$dims, T, "GP dkernel/dx1")
       # x2 = Check_X(x2, self$dims, T, "GP dkernel/dx2")
       
-      DK = Rcpp_dKernel_dx1(x1,x2,self$HP)
       return(lapply(1:self$dims, function(d)DK[1:nrow(x1) + nrow(x1)*(d-1), ,drop=F]))
     },
     MU   = function(x){
@@ -2715,7 +2714,7 @@ Make_CRNKG_grad = function(CRNGP, Xr){
   D = 1:CRNGP$dims
   tXr = t(Xr[D,])
   
-  V2 = CRNGP$HP[length(CRNGP$HP)]
+  V2 = 0 #CRNGP$HP[length(CRNGP$HP)]
   
   CRNKG = function(xs){
     
@@ -2822,6 +2821,7 @@ MCMC_CRNKG_grad = function(CRNGPs, Xr, check_Seeds=NULL,
         
         topKG <<- KG_v
         topxs <<- xs
+
         # cat("best x ", signif(topxs,3), "  value ", signif(topKG),"\n")
       }
       KG_v

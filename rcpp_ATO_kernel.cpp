@@ -37,7 +37,7 @@ NumericMatrix KGCB_cpp(NumericVector a,NumericVector b){
 
 
 // [[Rcpp::export]]
-NumericMatrix Rcpp_Kernel(NumericMatrix x1,
+NumericMatrix Rcpp_Kernel_old(NumericMatrix x1,
                           NumericMatrix x2,
                           NumericVector Hpars
 ){
@@ -68,6 +68,49 @@ NumericMatrix Rcpp_Kernel(NumericMatrix x1,
         sqe=0.0;
         for(int k=0; k<d; k++){ sqe += sq(k) * iLe(k);}
         K(j,i) += Hpars(2*d+2) + Hpars(2*d+1) * exp(sqe);
+      }
+      
+      
+    }  
+  }
+  
+  return K;
+}
+
+// [[Rcpp::export]]
+NumericMatrix Rcpp_Kernel(NumericMatrix x1,
+                          NumericMatrix x2,
+                          NumericVector Hpars
+){
+  NumericMatrix K(x1.nrow(), x2.nrow());
+  int d = x1.ncol()-1;
+  double sqt;
+  double sqe;
+  NumericVector iLt(d);
+  NumericVector iLe(d);
+  NumericVector sq(d);
+  
+  for (int k=0; k<d; k++){
+    iLt(k) = -0.5/(Hpars(k)*Hpars(k));
+    iLe(k) = -0.5/(Hpars(k+d+1)*Hpars(k+d+1));
+  }
+  
+  
+  for(int i=0; i<x2.nrow(); i++ ){
+    for(int j=0; j<x1.nrow(); j++ ){
+      
+      for(int k=0; k<d; k++){sq(k) = (x1(j,k)-x2(i,k)) * (x1(j,k)-x2(i,k));}
+      
+      sqt = 0.0;
+      for(int k=0; k<d; k++){ sqt += sq(k) * iLt(k); }
+      K(j,i) = Hpars(d) * exp(sqt);
+      
+      if ( abs(x1(j,d)-x2(i,d))<0.1 ){
+        sqe=0.0;
+        for(int k=0; k<d; k++){ sqe += sq(k) * iLe(k);}
+        K(j,i) += Hpars(2*d+2) + Hpars(2*d+1) * exp(sqe);
+        
+        if( sum(sq)<0.00000000000001){K(j,i) += Hpars(2*d+3);}
       }
       
       

@@ -220,18 +220,18 @@ while(length(GP1$yd)<Budget1){
     
     if(method==2){
       newx = MCMC_CRNKG_grad(list(GP1), check_Seeds=new_seed, Xr=Xr,
-                             N0=1000, Na=5, maxevals=20)
+                             N0=1000, Na=10, maxevals=100)
       
     }else if(method==4 | method==6){
       
       check_seeds = sample(new_seed)[1:min(5, new_seed)]
       newx = MCMC_CRNKG_grad(list(GP1), Xr=Xr, check_Seeds=check_seeds,
-                             N0=1000, Na=5, maxevals=20)
+                             N0=1000, Na=10, maxevals=100)
       
     }else if(method==5 | method==7){
       newx = MCMC_PWKG_grad(list(GP1), Xr=Xr,
-                            N0=1000, Na=5, maxevals=20, 
-                            PN0=4000, PNa=20, Pmaxevals=40)
+                            N0=1000, Na=10, maxevals=100, 
+                            PN0=4000, PNa=20, Pmaxevals=200)
       
     }
     
