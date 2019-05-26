@@ -1,3 +1,37 @@
+library(Rcpp)
+
+LHCdim = function(N0, dims){
+  # Args
+  #   N0: the number of points to generate
+  #   dims: the box for scaling+centring samples
+  #   
+  # Returns
+  #   a randomly generated LHC of N0 points in [0,1]^dims
+  
+  sapply(1:dims, function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
+}
+
+LHCran = function(N0, ran){
+  # Args
+  #   N0: the number of points to generate
+  #   ran: the box for scaling+centring samples
+  #   
+  # Returns
+  #   a randomly generated LHC of N0 points in box ran dimensions
+  
+  if(length(ran)==2)ran=matrix(ran,ncol=1)
+  
+  if (any(ran[1,]>=ran[2,])|nrow(ran)!=2) stop("LHC bounds are not valid: ", paste(bottoms, tops, collapse=", "))
+  
+  dims = ncol(ran)
+  LHC1 = sapply(1:dims,function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
+  
+  BB = matrix(ran[1,], N0, length(ran[1,]), byrow=T)
+  CC = matrix(ran[2,]-ran[1,], N0, length(ran[1,]), byrow=T)
+  
+  BB + LHC1*CC
+}
+
 ########################################################################################################
 # ATO
 
@@ -919,7 +953,7 @@ Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5){
 ########################################################################################################
 # GP
 
-GenFun = function(seed=1, LX=20, SS2=25, SC2=100, Nx=NULL){
+GenFun = function(seed=NULL, LX=20, SS2=25, SC2=100, Nx=NULL){
   # Create a single continuous GP test function  
   # Testfun:[0,100]^dims * N^+ -> R where the seed=0
   # gives the ground truth.
@@ -933,7 +967,7 @@ GenFun = function(seed=1, LX=20, SS2=25, SC2=100, Nx=NULL){
   # Returns
   #   result: a continouos callable function: R^d -> R
   
-  if(is.null(Nx)){Nx = prod(20/LX); Nx = min(Nx, 1000)}
+  if(is.null(Nx)){Nx = prod(200/LX); Nx = min(Nx, 1000)}
   
   dims = length(LX)
   ilX  = -0.5/LX^2
@@ -947,7 +981,7 @@ GenFun = function(seed=1, LX=20, SS2=25, SC2=100, Nx=NULL){
   
   ran    = matrix(c(0, 100), 2, dims)
   XX0    = LHCran(Nx, ran)
-  TrueK  = SEKernel(XX0,XX0) + 0.001*diag(nrow(XX0))
+  TrueK  = SEKernel(XX0,XX0) #+ 0.0001*diag(nrow(XX0))
   TrueiK = rcppeigen_invert_matrix(TrueK)
   
   SC0  = rnorm(1,0,sqrt(SC2))
@@ -961,7 +995,7 @@ GenFun = function(seed=1, LX=20, SS2=25, SC2=100, Nx=NULL){
     
     if (length(X)%%dims!=0)stop("wrong shape input to testfun")
     
-    if (ncol(X)!=dims)stop("wrong shape input to testfun")
+    if (ncol(X)!=dims)stop("wrong shape input to GP testfun")
     
     Ks = SEKernel(X,XX0)
     SC0 + SS1*as.numeric(Ks%*%iKy)
@@ -1047,12 +1081,12 @@ Build_Discrete_GP_CompSph2 = function(seed, TPars){
 
 Build_Wiggle = function(seed=1, dims=1, LX=10, SS2=100^2, WX=5, WW2=30^2, rho=0.5){
   
-  theta = GenFun(seed=seed*1000, 
-                 LX=rep(LX,dims), 
+  theta = GenFun(seed=seed*1000,
+                 LX=rep(LX,dims),
                  SS2=SS2, 
                  SC2=0
                  )$fun
-  browser()
+  # browser()
   wiggles = lapply(1:1000, function(i)GenFun(seed = i+seed*1000,
                                              LX=rep(WX, dims),
                                              SS2=(WW2*rho),
@@ -1081,23 +1115,3 @@ Build_Wiggle = function(seed=1, dims=1, LX=10, SS2=100^2, WX=5, WW2=30^2, rho=0.
   
   return(TestFun)
 }
-
-
-RHO = seq(0,1,0.05)
-VY  = sapply(RHO, function(rh){
-fun = Build_Wiggle(rho=rh)
-
-# plot(c(0,100), c(-200,200), col="white")
-# for(s in 500:0){
-#   XXS = cbind(1:100, s)
-#   YY = fun(XXS)
-#   lines(XXS[,1], YY, col='grey', lwd=1)
-# }
-# lines(XXS[,1], YY, col=s+1, lwd=2)
-
-var(fun(cbind(91, 1:1000)))
-})
-plot(RHO, VY)
-
-var(sapply(1:1000, function(i) GenFun(seed=i, SC2=0, SS2=100^2)$fun(50)))
-
