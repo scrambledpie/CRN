@@ -19,27 +19,19 @@ cat(getwd(),"\n\n")
 
 
 source('CRNMay2018.R')
-
+source('TestFuns.R')
 
 #############################################################################################
 #############################################################################################
-
-
-# methods
-# 1: iid uniform
-# 2: iid kg
-# 3: ?
-# 4: CRN KG
-# 5: CRN Frazier
 method_names = c("UNI MLE",
                  "KG",
                  "UNI HP",
-                 "CRNKG", 
-                 "PWKG_grad_MLE", 
-                 "PWKG_grad_HP",
-                 "PWKG_MLE",
-                 "PWKG_HP",
-                 "CRNKG_MLE N0=100")
+                 "CRNKG-CS", 
+                 "PWKG-CS", 
+                 "CRNKG-CS-W",
+                 "PWKG-CS-W",
+                 "UNNAMED",
+                 "UNNAMED")
 
 
 
@@ -131,10 +123,10 @@ Checkpoint = function(tryload=F){
 # Define Test Functions and their respetive input ranges
 
 set.seed(BOseed)
-dims      = 6
 
 TestFun   = Build_Ambulance_Testfun(BOseed, numtestseeds=10000, runlength=1)[[1]]
-XRAN      = matrix(c(0,20), 2, dims)
+XRAN      = attr(TestFun, 'ran')
+dims      = ncol(XRAN)
 
 
 Budget0   = 20
@@ -144,22 +136,18 @@ cat("TestFun Ambulance, method ", method_names[method], ", seed ", BOseed, "\n")
 
 ################################################################################################
 ################################################################################################
+# Initialize the GP models
 
-
-N0 = function()length(GP1$yd)
-NS = function()length(unique(GP1$xd[,ncol(GP1$xd)]))
-
-# Otherwise initialize the GP models
-
-t1 = proc.time()[3]
+t1   = proc.time()[3]
 XX   = UniformDesign_X(N0=Budget0, ran=XRAN, Ns=Ns0, TestFun=NULL, rounding=F, double=0) 
 YY   = TestFun(XX)
 eval_time = proc.time()[3] - t1
 
+# If we are not using CRN then overwrite seeds
 if(method%in%c(1, 2))  XX[,ncol(XX)] = 1:nrow(XX)
 
+# make the model and learn the hypers depending on wiggle/CS
 GP1  = CRNLHood$new(XX, YY, XRAN)
-
 if(method<6){
   GP1$Refresh(learnHpars=1)
 }else{
@@ -167,6 +155,11 @@ if(method<6){
 }
 fit_time = proc.time()[3] - t1 - eval_time
 
+N0 = function()length(GP1$yd)
+NS = function()length(unique(GP1$xd[,ncol(GP1$xd)]))
+
+#########################################
+# Initialize all the logs
 RecX = list()
 RecX[[N0()]] = GP1$RecX()
 
@@ -267,7 +260,7 @@ while(length(GP1$yd)<Budget1){
   }
   
   
-  
+  # Update logs
   GP1$Lhood_Prep()
   Lhoods[[N0()]]       = GP1$Lhood_standard(GP1$HP)
   Hpar_History[[N0()]] = GP1$HP
@@ -275,16 +268,16 @@ while(length(GP1$yd)<Budget1){
   RecX[[N0()]]         = GP1$RecX( oldrecx=tail(RecX,1)[[1]] )
   Timing[[N0()]]       = c(KG_time, eval_time, fit_time)
   
+  # measure performance
   cat(" Recomended x: ", signif(RecX[[N0()]], 1), ", ")
-  
   Cost[nrow(Cost)+1,] = c(N0(), TestFun( c(RecX[[N0()]], 0) ) )
+  cat( "\n", method_names[method], " ", as.numeric(Cost[nrow(Cost),]), "\n")
+  Checkpoint()
   
   
   if(debug){plot(Cost); lines(Cost)}
   
-  cat( "\n", method_names[method], " ", as.numeric(Cost[nrow(Cost),]), "\n")
   
-  Checkpoint()
   
   cat("\n\n")
 }

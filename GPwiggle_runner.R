@@ -45,10 +45,10 @@ if(length(Args)>0){
   Methods = rep(c(2, 4, 5, 6, 7), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   Ns0 = 5
-
+  
   set.seed(1)
   JOBS = sample(length(Methods))
-
+  
   myID = JOBS[as.numeric(Args[1])] 
   
   method = Methods[myID]
@@ -126,7 +126,9 @@ Checkpoint = function(tryload=F){
 # Define Test Functions and their respetive input ranges
 
 set.seed(BOseed)
+dims      = 8
 
+# TestFun   = Build_Ambulance_Testfun(BOseed, numtestseeds=10000, runlength=1)[[1]]
 TestFun   = Build_Xie_ATO_cpp_Testfun(BOseed, 2000, 1)[[1]]
 XRAN      = attr(TestFun, 'ran')
 dims      = ncol(XRAN)

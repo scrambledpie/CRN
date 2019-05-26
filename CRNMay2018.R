@@ -5,537 +5,18 @@ library(R6)
 library(FastGP)
 library(mcmc)
 
-Rcpp::sourceCpp('rcpp_ATO_kernel.cpp')
+source('utils.R')
 
-Rcpp::sourceCpp('Ambulances.cpp')
+Rcpp::sourceCpp('kernel.cpp')
 
-
-cat("\nRcpp compilation complete\n")
-
+cat(" kernel.cpp compilation complete. ")
 
 
 #############################################################################################
 #############################################################################################
 #############################################################################################
 #############################################################################################
-##  UTILITIES
-CPU = system("hostname",intern=T)
-
-# if (grepl("Book", CPU)){
-if (F){
-  Check_X = function(x, dims, withseeds, fname){
-    # Args
-    #   x: input vec or matrix
-    #   dims: number of continuous dims of x
-    #   withseeds: should the x include an integer seed aslast element
-    #   fname: printed with the error message
-    #
-    # Returns
-    #   x: correctly formatted as a matrix
-    
-    dimsN = dims + withseeds
-    
-    if (dims==1&is.null(dim(x))&!withseeds){ cat(fname, "converting x to matrix"); x = matrix(x, ncol=1)}
-    
-    if (length(x)==dimsN & length(dim(x))==0){ cat(fname, "converting x to matrix"); x = matrix(x, ncol=dimsN, nrow=1)}
-    
-    if (length(x)%%dimsN!=0) stop(fname, " wrong length input, got ", length(x))
-    
-    if (length(dim(x))!=2) stop(fname, "wrong input dim, got ", dim(x))
-    
-    if (ncol(x)!=dimsN) stop(fname, "wrong # input columns, got ", ncol(x))
-    
-    if (withseeds & !all(x[,dimsN]%%1==0)) stop(fname, "non-integer seeds not allowed")
-    
-    if (withseeds & !all(x[,dimsN]>=0)) stop(fname, "negative seeds not allowed")
-    
-    x
-  }
-}else{
-  Check_X = function(x, dims, withseeds, fname) x
-}
-
-LHCdim = function(N0, dims){
-  # Args
-  #   N0: the number of points to generate
-  #   dims: the box for scaling+centring samples
-  #   
-  # Returns
-  #   a randomly generated LHC of N0 points in [0,1]^dims
-  
-  sapply(1:dims, function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
-}
-
-LHCran = function(N0, ran){
-  # Args
-  #   N0: the number of points to generate
-  #   ran: the box for scaling+centring samples
-  #   
-  # Returns
-  #   a randomly generated LHC of N0 points in box ran dimensions
-  
-  if(length(ran)==2)ran=matrix(ran,ncol=1)
-  
-  if (any(ran[1,]>=ran[2,])|nrow(ran)!=2) stop("LHC bounds are not valid: ", paste(bottoms, tops, collapse=", "))
-  
-  dims = ncol(ran)
-  LHC1 = sapply(1:dims,function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
-  
-  BB = matrix(ran[1,], N0, length(ran[1,]), byrow=T)
-  CC = matrix(ran[2,]-ran[1,], N0, length(ran[1,]), byrow=T)
-  
-  BB + LHC1*CC
-}
-
-GenFun = function(seed=1, LX=20, SS2=25, SC2=100, Nx=NULL){
-  # Create a single continuous GP test function  
-  # Testfun:[0,100]^dims * N^+ -> R where the seed=0
-  # gives the ground truth.
-  # 
-  # Args
-  #   seed: fixed seed
-  #   LX: SE kernel length scales, this determines dimensions
-  #   SS2: the signal variance of the function
-  #   SC2: the variance of global seed offsets
-  # 
-  # Returns
-  #   result: a continouos callable function: R^d -> R
-    
-  if(is.null(Nx)){Nx = prod(20/LX); Nx = min(Nx, 1000)}
-  
-  dims = length(LX)
-  ilX  = -0.5/LX^2
-  SEKernel = function(x1,x2){
-    x1 = matrix(x1,ncol=dims)
-    x2 = matrix(x2,ncol=dims)
-    exp(Reduce(f = "+",lapply(1:dims,function(d)outer(x1[,d],x2[,d],"-")^2*ilX[d]  )))
-  }
-  
-  set.seed(seed)
-
-  ran = matrix(c(0, 20), 2, dims)
-  XX0    = LHCran(Nx, ran)
-  TrueK  = SEKernel(XX0,XX0) + 0.01*diag(nrow(XX0))
-  TrueiK = rcppeigen_invert_matrix(TrueK)
-  
-  SC0 = rnorm(1,0,sqrt(SC2))
-  y = mvrnorm(1,rep(0,nrow(XX0)),TrueK)
-  iKy=(TrueiK%*%y)[,1]
-  SS1 = sqrt(SS2)
-  
-  result=function(X){
-    
-    if (is.null(dim(X)) & length(X)==dims) X=matrix(X,ncol=dims, nrow=1)
-    
-    if (length(X)%%dims!=0)stop("wrong shape input to testfun")
-    
-    if (ncol(X)!=dims)stop("wrong shape input to testfun")
-    
-    Ks = SEKernel(X,XX0)
-    SC0 + SS1*as.numeric(Ks%*%iKy)
-  }
-  
-  dresult = function(X){
-    X = Check_X(X, dims, F, "dtestfun")
-    Ks = SEKernel(X,XX0)
-    2*sapply(1:dims, function(d)(outer(X[,d], XX0[,d], "-")*ilX[d]*Ks )%*%iKy)*SS1
-  }
-  
-  return(list(fun=result, dfun=dresult))
-}
-
-Optimizer_3  = function(f1, df1, ran, Ns=40, x0=NULL, debugging=F, reltol=1e-8, maxevals=Inf){
-  
-  # browser()
-  # Function that optimizes f1 and returns argmax
-  # 
-  # Args
-  #   f1: callable scalar output continuous function
-  #   df1: gradient of f1
-  #   ran: upper+lower bounds of all arguments
-  #   Ns: number of random optimiszer starts, can be 0
-  #   x0: an optional starting point for the optimizer
-  # 
-  # Returns
-  #   bestx: argmax of f1
-  
-  con = list(reltol = reltol, maxit=75)
-  
-  bs = ran[1,]
-  ts = ran[2,]
-  
-  stopifnot(!any(bs>=ts),
-            !length(bs)!=length(ts),
-            !any(is.infinite(bs)),
-            !any(is.infinite(ts)),
-            !any(is.na(bs)),
-            !any(is.na(ts)),
-            # !is.na(f1(bs)),
-            # !is.na(f1(ts)),
-            # !any(is.na(df1(bs))),
-            # !any(is.na(df1(ts))),
-            !is.null(bs),
-            !is.null(ts)
-            # !is.null(f1(bs)),
-            # !is.null(f1(ts)),
-            # length(df1(bs))==length(bs)
-            )
-  
-  if(!is.null(x0)){
-    stopifnot(
-      length(x0)==length(bs),
-      # all(bs<x0),
-      # all(x0<ts),
-      is.finite(f1(x0)),
-      all(is.finite(df1(x0))),
-      length(df1(x0))==length(x0)
-    )
-    x0 = pmin(x0, ts)
-  }
-  
-  
-  #################################################################################
-  # Make initializer and History
-  init = function()runif(length(bs), bs, ts)
-  x1 = init()
-  
-  History = matrix(c(x1,f1(x1)), 1)
-  evals   = 0
-  
-  ff1 = function(x){
-    # cat(evals," ")
-    if(evals==maxevals)stop()
-    if(any(x<ran[1,])|any(x>ran[2,]))stop("out of range!")
-    OO = f1(x)
-    if(!(is.na(OO) | is.infinite(OO) | is.null(OO) )){ 
-      History <<- rbind(History,c(x,OO))
-    }else{stop()}
-    
-    evals <<- evals+1
-    return(-OO)
-  }
-  
-  dff1 = function(x){
-    -df1(x)
-  }
-  
-  
-  #################################################################################
-  # If we have a given starting point, then optimise from that start!
-  if (!is.null(x0)){
-    Output = ff1(x0)
-    evals = 0
-    Output = tryCatch({ optim(par = x0, fn = ff1,dff1,method = "L-BFGS-B", control = con) }, error = function(e)-1e9,warning = function(w)-1e9)
-    evals = 0
-    Output = tryCatch({ optim(par = x0, fn = ff1,dff1,method = "CG", control = con)       }, error = function(e)-1e9,warning = function(w)-1e9)
-    # evals = -maxevals
-    # Output = tryCatch({ optim(par = x0, fn = ff1, method = "Nelder-Mead", control = con)  }, error = function(e)-1e9,warning = function(w)-1e9)
-  }
-  
-  # If we want to do some random starts......
-  if (Ns>0){
-    Init_par = LHCran(Ns, ran)
-    for (i in 1:Ns){
-      evals = 0
-      Output = tryCatch({ optim(par = Init_par[i,], fn = ff1,dff1,method = "L-BFGS-B", control = con) }, error = function(e)-1e9,warning = function(w)-1e9)
-      evals = 0
-      Output = tryCatch({ optim(par = Init_par[i,], fn = ff1,dff1,method = "CG", control = con)       }, error = function(e)-1e9,warning = function(w)-1e9)
-      # evals = -maxevals
-      # Output = tryCatch({ optim(par = init(),fn = ff1, method = "Nelder-Mead", control = con)  }, error = function(e)-1e9,warning = function(w)-1e9)
-    }
-  }
-  
-  #################################################################################
-  # Get the best input from the history of inputs and run optimizers one more time and get the final best
-  filt = apply(History[,1:length(ts), drop=F],1,function(h)all(h>bs)&all(h<ts))
-  xHist = History[filt, 1:length(ts), drop=F]
-  lHist = History[filt, length(ts)+1]
-  x0 = xHist[which.max(lHist), ]
-  
-  evals = 0
-  Output = tryCatch({ optim(par = x0, fn = ff1,dff1,method = "L-BFGS-B", control = con) }, error = function(e)-1e9,warning = function(w)-1e9)
-  evals = 0
-  Output = tryCatch({ optim(par = x0, fn = ff1,dff1,method = "CG", control = con)       }, error = function(e)-1e9,warning = function(w)-1e9)
-  # evals = -maxevals
-  # Output = tryCatch({ optim(par = x0, fn = ff1, method = "Nelder-Mead", control = con)  }, error = function(e)-1e9,warning = function(w)-1e9)
-  
-  #################################################################################
-  # Get the final best and return it
-  
-  filt = apply(History[,-ncol(History), drop=F],1,function(h)all(h>=bs)&all(h<=ts))
-  xHist = History[filt, 1:length(x0), drop=F]
-  lHist = History[filt, length(x0)+1]
-  bestx = xHist[which.max(lHist), ]
-  
-  # if(debugging) browser()
-  
-  list(xmax = bestx, fmax = max(lHist))
-  
-}
-
-Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, reltol=1e-8, maxevals=Inf){
-  
-  
-  cat("\n Na:", Na, ", N0: ", N0, ", maxevals: ",maxevals)
-  # browser()
-  # Function that maximizes f1 and returns argmax
-  # 
-  # Args
-  #   f1: callable scalar output continuous function
-  #   df1: gradient of f1
-  #   ran: upper+lower bounds of all arguments
-  #   N0: number of random intial function evaluations
-  #   Na: nuber of the random initial points to use for grad ascent
-  #   x0: an optional starting point for the optimizer
-  # 
-  # Returns
-  #   bestx: argmax of f1
-  
-  con = list(reltol = reltol, maxit=75)
-  
-  bs = ran[1,]
-  ts = ran[2,]
-  
-  stopifnot(!any(bs>=ts),
-            !length(bs)!=length(ts),
-            !any(is.infinite(bs)),
-            !any(is.infinite(ts)),
-            !any(is.na(bs)),
-            !any(is.na(ts)),
-            !(is.null(x0)&N0==0),
-            !is.null(bs),
-            !is.null(ts)
-  )
-  
-  
-  #################################################################################
-  # Make random initializer and History
-  init = function()runif(length(bs), bs, ts)
-  x1   = init()
-  
-  History = matrix(c(x1, f1(x1)) , 1)
-  evals   = 0
-  
-  #################################################################################
-  # objective function wrappers
-  ff1 = function(x){
-    # cat(evals," ")
-    if(evals>=maxevals)stop("reached max evals")
-    if(any(x<ran[1,]))stop("out of range, too low! ", paste(x, collapse = ", "))
-    if(any(x>ran[2,]))stop("out of range, too high! ", paste(x, collapse = ", "))
-    
-    # evaluate objective and sanity check
-    OO = f1(x)
-    
-    stopifnot(
-      !is.na(OO),
-      !is.infinite(OO),
-      !is.null(OO)
-    )
-    
-    if(all(x>bs)&all(x<ts)) History <<- rbind(History,c(x,OO))
-    
-    evals <<- evals+1
-    return(-OO)
-  }
-  
-  dff1 = function(x){
-    -df1(x)
-  }
-  
-  safe_optim = function(x_start){
-    
-    evals = 0
-    dead = tryCatch({ 
-        optim(par = x_start, fn = ff1, dff1, method = "L-BFGS-B", control = con) 
-      }, 
-      error = function(e)-1e9,
-      warning = function(w)-1e9
-    )
-    
-    evals = 0
-    dead = tryCatch({ 
-        optim(par = x_start, fn = ff1, dff1, method = "CG", control = con) 
-      }, 
-      error = function(e)-1e9,
-      warning = function(w)-1e9
-    )
-  }
-  
-  safe_ff1 = function(x){
-    tryCatch({ 
-        ff1(x)
-      }, 
-      error = function(e)NaN,
-      warning = function(w)NaN
-    )
-  }
-  
-  #################################################################################
-  # If we have a given starting point, then optimise from that start!
-  if (!is.null(x0)){
-    if(is.null(dim(x0))) x0 = matrix(x0, 1)
-    dead = apply(x0, 1, safe_ff1)
-    dead = apply(x0, 1, safe_optim)
-  }
-  
-  #################################################################################
-  # If we want to do some random settings
-  if (N0>0){
-
-    X0      = LHCran(N0, ran)
-    evals   = -N0
-    Output  = apply(X0, 1, safe_ff1)
-    
-    Keepers = !is.nan(Output)
-    Output  = Output[Keepers]
-    X0      = X0[Keepers,,drop=F]
-    
-    rank    = order(Output, decreasing=T)
-    Na      = min(Na, length(Output))
-    
-    X0      = History[rank[1:Na], , drop=F]
-    
-    dead    = apply(X0, 1, safe_optim)
-    
-  }
-  
-  #################################################################################
-  # Get the best and run optimizers one more time
-  lHist = History[, length(ts)+1]
-  bestx = History[which.max(lHist), 1:length(ts)]
-  dead  = safe_optim(bestx)
-  
-
-  #################################################################################
-  # Get the final best and return it
-  lHist = History[, length(ts)+1]
-  bestx = History[which.max(lHist), 1:length(ts)]
-  return( list(xmax = bestx, fmax = max(lHist))  )
-  
-}
-
-Freezer    = function(f1, df1, ran, fdims, fvals, x0=NULL,...){
-  # Function that optimizes f1 with some fixed inputs
-  # 
-  # Args
-  #   f1: callable scalar output continuous function
-  #   df1: gradient of f1
-  #   ran: lower+upper bounds of all arguments
-  #   fdims: list of indices of frozen dims
-  #   fvals: values of frozen dimensions
-  #   ...: arguments passed to Optimizer()
-  # 
-  # Returns
-  #   bestx: only unfrozen dims argmax of f1
-  
-  bs = ran[1,]
-  ts = ran[2,]
-  stopifnot(
-    all(bs<ts),
-    length(bs)==length(ts),
-    all(is.finite(bs)),
-    all(is.finite(ts)),
-    # !is.na(f1(bs)),
-    # !is.na(f1(ts)),
-    # !any(is.na(df1(bs))),
-    # !any(is.na(df1(ts))),
-    !is.null(bs),
-    !is.null(ts),
-    # !is.null(f1(bs)),
-    # !is.null(f1(ts)),
-    # length(df1(bs))==length(bs),
-    length(fdims)<length(bs),
-    length(fvals)==length(fdims),
-    # all(bs[fdims]<fvals),
-    all(fvals<ts[fdims])
-  )
-  
-  nn      = ncol(ran)
-  
-  odims = (1:nn)[!1:nn%in%fdims]
-  
-  ran_o = ran[,odims]
-  
-  calls = 0
-  x1 = 1:nn
-  f2  = function(x){
-    x1[fdims] = fvals
-    x1[odims] = x  
-    calls <<- calls+1 
-    f1(x1)
-  }
-  df2 = function(x){
-    x1[fdims]=fvals
-    x1[odims]=x
-    df1(x1)[odims]
-  }
-  
-  if(!is.null(x0)){
-    if(length(x0)==ncol(ran)){
-      x0 = x0[odims]
-    }else if(length(x0)!=length(odims)){
-      x0=NULL
-    }
-  }
-  # browser()
-  O = Optimizer_2(f2, df2, ran_o, x0=x0, ...)
-  
-  O
-}
-
-EI_optimizer = function(EIfun, ran, Ns=50){
-  
-  # Function that optimizes EIfun and returns argmax
-  # 
-  # Args
-  #   EIfun: callable scalar output continuous function
-  #   ran: lower+upper bounds of all arguments
-  #   Ns: number of random optimizer starts 
-  # 
-  # Returns
-  #   bestx: argmax of EIfun
-  
-  bottoms = ran[1,]
-  tops = ran[2,]
-  
-  if (any(bottoms>=tops)|nrow(ran)!=2) stop("EI optim bounds are not valid: ", paste(bottoms, tops, collapse=", "))
-  
-  sXA = LHCran(Ns, ran)
-  
-  topO = -Inf
-  topxa = 0
-  t=0
-  Obj = function(xa){
-    if(any(xa<bottoms)|any(xa>tops)) return(0)
-    
-    out = EIfun(xa)
-    if (out > topO){
-      topO  <<- out
-      topxa <<- xa
-    }
-    out
-  }
-  
-  if(length(bottoms)>1){
-    OO=sapply(1:Ns,function(i)optim(sXA[i,],Obj,method = "Nelder-Mead",control = list(maxit = 75, fnscale = -1)))
-  }else{
-    
-    Xvals = seq(bottoms, tops, len=100)
-    best  = which.max(sapply(Xvals[-c(1,100)], Obj)) +1
-    IT    = c(Xvals[best-1], Xvals[best+1])
-    OO    = optimise(f = Obj,interval = IT,maximum = T)
-  }
-  
-  return( list(x=topxa, fn=topO) )
-}
-
-
-#############################################################################################
-#############################################################################################
-#############################################################################################
-#############################################################################################
-##  MODELS
+##  MODEL
 
 {
   MU    = function(HP, x, xd, yd){
@@ -1984,7 +1465,7 @@ EI_optimizer = function(EIfun, ran, Ns=50){
 #############################################################################################
 #############################################################################################
 #############################################################################################
-## ALGORITHMS
+## ACQUISITION FUNCTIONS
 
 
 KGCBcpp   = function(a, b){
@@ -2032,7 +1513,6 @@ KGCBcpp   = function(a, b){
   
   sum(  a[I]*(pC[-1]-pC[-length(pC)]) - b[I]*(dC[-1]-dC[-length(pC)])  ) - max(a)
 }
-
 
 Build_ref_X = function(GP, rounding=F){
   
@@ -2377,6 +1857,185 @@ New_CRNUniformDesign = function(N0, XRAN, TestFun, split=0.5, rounding=F){
 
 
 
+
+
+Make_CRNKG_grad = function(CRNGP, Xr){
+  
+  # Check reference points and remove repeats
+  Xr = Check_ref_X(Xr, CRNGP$dims, T, "CRNKG Xr")
+  ref_seed = Xr[1,CRNGP$dims+1]
+  
+  # browser()
+  iKr = CRNGP$kernel(Xr, CRNGP$xd)%*%CRNGP$iK
+  Mr  = CRNGP$MU(Xr)
+  
+  D = 1:CRNGP$dims
+  tXr = t(Xr[D,])
+  
+  V2 = 0 #CRNGP$HP[length(CRNGP$HP)]
+  
+  CRNKG = function(xs){
+    
+    # repeats = apply(xs[D]==tXr, 2, all)
+    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
+    
+    xs = matrix(xs,1)
+    # xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
+    
+    # if x is in the set Xr
+    # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
+    
+    
+    SDx = sqrt(abs(CRNGP$COV(xs, xs)) + V2 )[1]
+    
+    # browser()
+    
+    P0 = CRNGP$kernel(Xr, xs)
+    # Nr = P0 > 0.001
+    # 
+    SIGT = rep(0, length(P0))
+    # 
+    # SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
+    SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
+    
+    xs0  = matrix(c(xs[D], ref_seed), 1)
+    
+    SIGT = c(SIGT, CRNGP$COV(xs0, xs)/SDx)
+    
+    MM   = c(Mr, CRNGP$MU(xs0))
+    
+    O = KGCBfilter(MM, SIGT)
+    
+    O
+  }
+  
+  dCRNKG = function(xs){
+    # xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
+    xs = matrix(xs, 1)
+    # if x is in the set Xr
+    # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
+    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
+    
+    SDx = sqrt(abs(CRNGP$COV(xs, xs)) + V2)[1]
+    
+    # browser()
+    
+    P0 = CRNGP$kernel(Xr, xs)
+    Nr = P0 > -Inf
+    # 
+    SIGT = rep(0, length(P0))
+    # 
+    SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
+    # SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
+    
+    xs0  = matrix(c(xs[D], ref_seed), 1)
+    
+    SIGT = c(SIGT, CRNGP$COV(xs0, xs)/SDx)
+    
+    MM   = c(Mr, CRNGP$MU(xs0))
+    
+    O = KGCBfilter_grad(MM, SIGT)
+    
+    Nr = abs(O$dsig)>0
+    Nrr = which(Nr[-length(Nr)])
+    
+    Nr = which(Nr)
+    
+    # browser()
+    
+    dKG_s = (O$dsig[Nr]%*%CRNGP$dSIGT.dx_xr(xs, Xr[Nrr,,drop=F], t(iKr[Nrr,,drop=F]))  )[1:CRNGP$dims]
+    
+    dKG_m = unlist( CRNGP$DTheta(xs[1:CRNGP$dims])) * O$dmu[length(O$dmu)]
+    # dKG_s = (O$dsig%*%CRNGP$dSIGT.dx_xr(xs, Xr, t(iKr)))[1:CRNGP$dims]
+    
+    list(dKG=dKG_m + dKG_s, KG=O$KG)
+  }
+  
+  return(list(KG=CRNKG, dKG=dCRNKG))
+}
+
+MCMC_CRNKG_grad = function(CRNGPs, Xr, check_Seeds=NULL,
+                           N0=1000, Na=1, maxevals=50){
+  
+  dims = CRNGPs[[1]]$dims
+  
+  if(is.null(check_Seeds)) check_Seeds = max(CRNGPs[[1]]$xd[,dims+1])
+  
+  cat("optim CRNKG_grad, check seeds:", check_Seeds, "...")
+  
+  # Check reference points and remove repeats
+  Xr = Check_ref_X(Xr, CRNGPs[[1]]$dims, T, "CRNKG Xr")
+  
+  topKG = -Inf
+  topxs = 0
+  
+  if(length(CRNGPs)==1){
+    KG_FUNS = Make_CRNKG_grad(CRNGPs[[1]], Xr)
+    KG_i = KG_FUNS$KG
+    dKG_i = KG_FUNS$dKG
+    KG = function(xs){
+      KG_v = KG_i(xs)
+      if(KG_v > topKG){
+        
+        topKG <<- KG_v
+        topxs <<- xs
+
+        # cat("best x ", signif(topxs,3), "  value ", signif(topKG),"\n")
+      }
+      KG_v
+    }
+    
+    dKG = function(xs){
+      O = dKG_i(xs)
+      if(O$KG > topKG){
+        topKG <<- O$KG
+        topxs <<- xs
+      }
+      return(O$dKG)
+    }
+    
+  }else{
+    KG_FUNS = lapply(CRNGPs, function(CRNGP)Make_CRNKG_grad(CRNGP, Xr) )
+    
+    KG = function(xs){
+      KG_v = mean(sapply(KG_FUNS, function(KG_F)KG_F$KG(xs)))
+      if(KG_v > topKG){
+        topKG <<- KG_v
+        topxs <<- xs
+      }
+      KG_v
+    }
+    
+    dKG = function(xs){
+      KG_v = sapply(KG_FUNS, function(KG_F)KG_F$dKG(xs))
+      KG_v = apply(KG_v, 1, mean)
+      KG_v
+    }
+    
+  }
+  
+  
+  # KG_i = sapply(check_seeds, function(s)sapply(1:99,function(xi)KG(c(xi,s))))
+  # plot(c(0,100), range(KG_i), col="white")
+  # BB = sapply(check_seeds, function(s)lines(1:99, KG_i[,s], col=s+1))
+  
+  for(s in check_Seeds){
+    KGs = function(x)KG(c(x,s))
+    dKGs = function(x)dKG(c(x,s))
+    dead = Optimizer_2(KGs, dKGs, ran=CRNGPs[[1]]$XRAN,
+                       N0=N0,
+                       Na=Na,
+                       maxevals=maxevals)
+  }
+  
+  # cat("best KG ", topxs, "\t", topKG,"\t", max(KG_i), "\n")
+  cat("done, ")
+  topxs
+}
+
+
+
+
 Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
   Xr = Check_ref_X(Xr, CRNGP$dims, T, "PWKG Xr")
   new_seed = max(CRNGP$xd[,CRNGP$dims+1]) + 1
@@ -2701,1222 +2360,7 @@ MCMC_PWKG_grad = function(CRNGPs, Xr, ratio=1,
 
 
 
-Make_CRNKG_grad = function(CRNGP, Xr){
-  
-  # Check reference points and remove repeats
-  Xr = Check_ref_X(Xr, CRNGP$dims, T, "CRNKG Xr")
-  ref_seed = Xr[1,CRNGP$dims+1]
-  
-  # browser()
-  iKr = CRNGP$kernel(Xr, CRNGP$xd)%*%CRNGP$iK
-  Mr  = CRNGP$MU(Xr)
-  
-  D = 1:CRNGP$dims
-  tXr = t(Xr[D,])
-  
-  V2 = 0 #CRNGP$HP[length(CRNGP$HP)]
-  
-  CRNKG = function(xs){
-    
-    # repeats = apply(xs[D]==tXr, 2, all)
-    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
-    
-    xs = matrix(xs,1)
-    # xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
-    
-    # if x is in the set Xr
-    # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
-    
-    
-    SDx = sqrt(abs(CRNGP$COV(xs, xs)) + V2 )[1]
-    
-    # browser()
-    
-    P0 = CRNGP$kernel(Xr, xs)
-    # Nr = P0 > 0.001
-    # 
-    SIGT = rep(0, length(P0))
-    # 
-    # SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
-    SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
-    
-    xs0  = matrix(c(xs[D], ref_seed), 1)
-    
-    SIGT = c(SIGT, CRNGP$COV(xs0, xs)/SDx)
-    
-    MM   = c(Mr, CRNGP$MU(xs0))
-    
-    O = KGCBfilter(MM, SIGT)
-    
-    O
-  }
-  
-  dCRNKG = function(xs){
-    # xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
-    xs = matrix(xs, 1)
-    # if x is in the set Xr
-    # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
-    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
-    
-    SDx = sqrt(abs(CRNGP$COV(xs, xs)) + V2)[1]
-    
-    # browser()
-    
-    P0 = CRNGP$kernel(Xr, xs)
-    Nr = P0 > -Inf
-    # 
-    SIGT = rep(0, length(P0))
-    # 
-    SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
-    # SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
-    
-    xs0  = matrix(c(xs[D], ref_seed), 1)
-    
-    SIGT = c(SIGT, CRNGP$COV(xs0, xs)/SDx)
-    
-    MM   = c(Mr, CRNGP$MU(xs0))
-    
-    O = KGCBfilter_grad(MM, SIGT)
-    
-    Nr = abs(O$dsig)>0
-    Nrr = which(Nr[-length(Nr)])
-    
-    Nr = which(Nr)
-    
-    # browser()
-    
-    dKG_s = (O$dsig[Nr]%*%CRNGP$dSIGT.dx_xr(xs, Xr[Nrr,,drop=F], t(iKr[Nrr,,drop=F]))  )[1:CRNGP$dims]
-    
-    dKG_m = unlist( CRNGP$DTheta(xs[1:CRNGP$dims])) * O$dmu[length(O$dmu)]
-    # dKG_s = (O$dsig%*%CRNGP$dSIGT.dx_xr(xs, Xr, t(iKr)))[1:CRNGP$dims]
-    
-    list(dKG=dKG_m + dKG_s, KG=O$KG)
-  }
-  
-  return(list(KG=CRNKG, dKG=dCRNKG))
-}
 
-MCMC_CRNKG_grad = function(CRNGPs, Xr, check_Seeds=NULL,
-                           N0=1000, Na=1, maxevals=50){
-  
-  dims = CRNGPs[[1]]$dims
-  
-  if(is.null(check_Seeds)) check_Seeds = max(CRNGPs[[1]]$xd[,dims+1])
-  
-  cat("optim CRNKG_grad, check seeds:", check_Seeds, "...")
-  
-  # Check reference points and remove repeats
-  Xr = Check_ref_X(Xr, CRNGPs[[1]]$dims, T, "CRNKG Xr")
-  
-  topKG = -Inf
-  topxs = 0
-  
-  if(length(CRNGPs)==1){
-    KG_FUNS = Make_CRNKG_grad(CRNGPs[[1]], Xr)
-    KG_i = KG_FUNS$KG
-    dKG_i = KG_FUNS$dKG
-    KG = function(xs){
-      KG_v = KG_i(xs)
-      if(KG_v > topKG){
-        
-        topKG <<- KG_v
-        topxs <<- xs
-
-        # cat("best x ", signif(topxs,3), "  value ", signif(topKG),"\n")
-      }
-      KG_v
-    }
-    
-    dKG = function(xs){
-      O = dKG_i(xs)
-      if(O$KG > topKG){
-        topKG <<- O$KG
-        topxs <<- xs
-      }
-      return(O$dKG)
-    }
-    
-  }else{
-    KG_FUNS = lapply(CRNGPs, function(CRNGP)Make_CRNKG_grad(CRNGP, Xr) )
-    
-    KG = function(xs){
-      KG_v = mean(sapply(KG_FUNS, function(KG_F)KG_F$KG(xs)))
-      if(KG_v > topKG){
-        topKG <<- KG_v
-        topxs <<- xs
-      }
-      KG_v
-    }
-    
-    dKG = function(xs){
-      KG_v = sapply(KG_FUNS, function(KG_F)KG_F$dKG(xs))
-      KG_v = apply(KG_v, 1, mean)
-      KG_v
-    }
-    
-  }
-  
-  
-  # KG_i = sapply(check_seeds, function(s)sapply(1:99,function(xi)KG(c(xi,s))))
-  # plot(c(0,100), range(KG_i), col="white")
-  # BB = sapply(check_seeds, function(s)lines(1:99, KG_i[,s], col=s+1))
-  
-  for(s in check_Seeds){
-    KGs = function(x)KG(c(x,s))
-    dKGs = function(x)dKG(c(x,s))
-    dead = Optimizer_2(KGs, dKGs, ran=CRNGPs[[1]]$XRAN,
-                       N0=N0,
-                       Na=Na,
-                       maxevals=maxevals)
-  }
-  
-  # cat("best KG ", topxs, "\t", topKG,"\t", max(KG_i), "\n")
-  cat("done, ")
-  topxs
-}
-
-
-
-Make_GP_List = function(GP, N){
-  
-  samples = 1:N
-  
-  if ("BitbyBitOptimise"%in%names(GP)){
-    
-      log_density = GP$Lhood
-      LHpars_0 = GP$BitbyBitOptimise()
-      
-  }else{
-    
-    
-    LHP = if(is.null(GP$GetHpars())) NULL else log(GP$GetHpars())
-    
-    Lfuns = LhoodBuilder(GP$xd, GP$yd)
-    
-    log_density = Lfuns$LH
-    
-    LHpars_0 = Optimizer(Lfuns$LH, 
-                         Lfuns$DLH, 
-                         rbind(Lfuns$lo, Lfuns$hi),
-                         Ns=Ns, x0=LHP
-                        )$xmax
-  }
-  
-   
-  
-  GP_list = lapply(samples, function(i)GP$Refresh(Hpars = Hpars[[i]]))
-  
-  GP_list
-}
-
-RecX_GP_List = function(GPs){
-  
-  if("BitbyBitOptimise"%in%names(GPs[[1]])){
-    fun =function(x) mean(sapply(GPs, function(GP)GP$MU(c(x,0))))
-    dfun =function(x) mean(sapply(GPs, function(GP)GP$DTheta(x)))
-  }else{
-    fun =function(x) mean(sapply(GPs, function(GP)GP$MU(x)))
-    dfun =function(x) mean(sapply(GPs, function(GP)GP$DMU(x)))
-  }
-  Optimizer(fun, dfun, GPs[[1]]$XRAN, Ns=50)$xmax
-}
-
-
-
-
-
-
-########################################################################
-########################################################################
-########################################################################
-########################################################################
-# Benchmark Problems
-
-old_RunATO = function(BaseStockLevel=rep(1,8), seed=1, runlength=5){
-  
-  # Args:
-  #   BaseStockLEvel: target stock quantities for each product
-  #   runlength: integer, repetitions of the simulation
-  #   seed: integer, to force deterministic simulation
-  #
-  # Returns:
-  #   fnAvg: Average profit over runlength reps of simulation
-  
-  NumComponentType=8;               #% number of component types
-  
-  ProTimeMean = c(0.15, 0.4, 0.25, 0.15, 0.25, 0.08, 0.13, 0.4)
-  ProTimeStd = 0.15*ProTimeMean
-  Profit = 1:8
-  HoldingCost = matrix(2, 1, NumComponentType)
-  # % holding cost of each component in
-  # % inventory
-  # 
-  # % Parameters of Customers
-  
-  ArrivalRate = 12             #% assume Possion arrival
-  # %NumCustomerType=5;             % number of customer types
-  # %CustomerProb=[0.3,0.25,0.2,0.15,0.1];   % probability of each customer
-  KeyComponent=c(1,0,0,1,0,1,0,0,
-                 1,0,0,0,1,1,0,0,
-                 0,1,0,1,0,1,0,0,
-                 0,0,1,1,0,1,0,0,
-                 0,0,1,0,1,1,0,0)
-  KeyComponent = matrix(KeyComponent, nrow=5, byrow=TRUE)
-  
-  NonKeyComponent=c(0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,0,0,
-                    0,0,0,0,0,0,0,1,
-                    0,0,0,0,0,0,1,0)
-  NonKeyComponent = matrix(NonKeyComponent, nrow=5, byrow=TRUE)
-  
-  WarmUp = 20
-  TotalTime = 70
-  
-  #% Simulation
-  fnSum = 0.0
-  set.seed(seed)
-  
-  for (k in 1:runlength){
-    
-    # runif_preset = runif()
-    
-    EventTime = matrix(1e5, 1, 1+NumComponentType)
-    EventTime[1] = -log(runif(1))/ArrivalRate
-    TotalProfit = 0
-    TotalCost = 0
-    Inventory = BaseStockLevel
-
-    Clock = 0
-    
-    while (Clock<TotalTime){
-      OldInventory = Inventory
-      OldClock = Clock
-      Clock = min(EventTime)
-      event = which.min(EventTime)
-      if (event==1){ # a customer has come!
-        
-        temp=runif(1)
-        if (temp<0.3){
-          CustomerType=1
-        }else if (temp<0.55){
-          CustomerType=2
-        }else if (temp<0.75){
-          CustomerType=3
-        }else if (temp<0.9){
-          CustomerType=4
-        }else{
-          CustomerType=5
-        }
-        
-        
-        
-        KeyOrder = KeyComponent[CustomerType,]
-        NonKeyOrder = NonKeyComponent[CustomerType,]
-        Sell=1
-        for (i in 1:NumComponentType){
-          if (Inventory[i] - KeyOrder[i] < 0){
-            Sell=0 
-          }
-          if (Inventory[i] - NonKeyOrder[i] < 0) {
-            NonKeyOrder[i] = Inventory[i]
-          }
-        }
-        if (Sell==1){
-          Inventory = Inventory - KeyOrder - NonKeyOrder
-          if (Clock>WarmUp){
-            TotalProfit = TotalProfit + sum(Profit*(KeyOrder + NonKeyOrder))
-          }
-        }
-        
-        EventTime[1]=Clock-log(runif(1))/ArrivalRate
-        if (Sell==1){
-          for (i in 1:NumComponentType){
-            if (Inventory[i]<BaseStockLevel[i]  && EventTime[i+1]>1e4){
-              EventTime[i+1] = Clock + max(0,ProTimeMean[i]+rnorm(1)*ProTimeStd[i])
-            }
-          }
-        }
-      }else{ # stock has arrived
-        ComponentType = event-1;
-        Inventory[ComponentType] = Inventory[ComponentType]+1
-        if (Inventory[ComponentType]>=BaseStockLevel[ComponentType]){
-          EventTime[event]=1e5
-          if (Clock>WarmUp){
-            TotalCost=TotalCost+(Clock-OldClock)* sum(OldInventory*HoldingCost)
-          }
-        }
-      }
-    }
-    fn = (TotalProfit-TotalCost)/(TotalTime-WarmUp);
-    fnSum = fnSum + fn;
-  }
-  
-  fnAvg = fnSum / runlength
-
-  return(fnAvg)
-}
-
-RunATO = function(BaseStockLevel=rep(1,8), seed=1, runlength=5){
-  
-  # Args:
-  #   BaseStockLEvel: target stock quantities for each product
-  #   runlength: integer, repetitions of the simulation
-  #   seed: integer, to force deterministic simulation
-  #
-  # Returns:
-  #   fnAvg: Average profit over runlength reps of simulation
-  
-  NumComponentType=8;               #% number of component types
-  
-  ProTimeMean = c(0.15, 0.4, 0.25, 0.15, 0.25, 0.08, 0.13, 0.4)
-  ProTimeStd = 0.15*ProTimeMean
-  Profit = 1:8
-  HoldingCost = matrix(2, 1, NumComponentType)
-  # % holding cost of each component in
-  # % inventory
-  # 
-  # % Parameters of Customers
-  
-  ArrivalRate = 12             #% assume Possion arrival
-  iArrivalRate = 1/ArrivalRate
-  # %NumCustomerType=5;             % number of customer types
-  # %CustomerProb=[0.3,0.25,0.2,0.15,0.1];   % probability of each customer
-  KeyComponent=c(1,0,0,1,0,1,0,0,
-                 1,0,0,0,1,1,0,0,
-                 0,1,0,1,0,1,0,0,
-                 0,0,1,1,0,1,0,0,
-                 0,0,1,0,1,1,0,0)
-  KeyComponent = matrix(KeyComponent, nrow=5, byrow=TRUE)
-  
-  NonKeyComponent=c(0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,0,0,
-                    0,0,0,0,0,0,0,1,
-                    0,0,0,0,0,0,1,0)
-  NonKeyComponent = matrix(NonKeyComponent, nrow=5, byrow=TRUE)
-  
-  WarmUp = 20
-  TotalTime = 70
-  
-  #% Simulation
-  fnSum = 0.0
-  set.seed(seed)
-  Customer_series = sample(size=TotalTime*ArrivalRate*runlength*2, 1:5, prob=c(0.3,0.25,0.2,0.15,0.1), replace=T)
-  t = 1
-  
-  for (k in 1:runlength){
-    
-    # runif_preset = runif()
-    
-    EventTime = matrix(1e5, 1, 1+NumComponentType)
-    EventTime[1] = -log(runif(1))*iArrivalRate
-    TotalProfit = 0
-    TotalCost = 0
-    Inventory = BaseStockLevel
-    
-    Clock = 0
-    
-    while (Clock<TotalTime){
-      OldInventory = Inventory
-      OldClock = Clock
-      Clock = min(EventTime)
-      event = which.min(EventTime)
-      if (event==1){ # a customer has come!
-        # Reset clock
-        EventTime[1]=Clock-log(runif(1))*iArrivalRate
-        
-        # Get new customer
-        CustomerType = Customer_series[t]
-        t=t+1
-        
-        KeyOrder = KeyComponent[CustomerType,]
-        NonKeyOrder = NonKeyComponent[CustomerType,]
-
-        Sell = all(Inventory>=KeyOrder)
-        NonKeyOrder = Inventory * (Inventory<=NonKeyOrder) + NonKeyOrder*(Inventory>NonKeyOrder)
-        
-        if (Sell){
-          Inventory = Inventory - KeyOrder - NonKeyOrder
-          if (Clock>WarmUp){ TotalProfit = TotalProfit + sum(Profit*(KeyOrder + NonKeyOrder)) }
-
-          for (i in 1:NumComponentType){
-            if (Inventory[i]<BaseStockLevel[i]  && EventTime[i+1]>1e4){
-              EventTime[i+1] = Clock + max(0,ProTimeMean[i]+rnorm(1)*ProTimeStd[i])
-            }
-          }
-          # reset = ((Inventory<BaseStockLevel)  & (EventTime[-1]>1e4))
-          # new_times = rnorm(sum(reset), ProTimeMean[reset], ProTimeStd[reset])
-          # EventTime[-1][reset] = Clock + new_times*(new_times>0) #max(0,ProTimeMean[i]+rnorm(1)*ProTimeStd[i])
-        }
-        
-        
-      }else{ # stock has arrived
-        ComponentType = event-1;
-        Inventory[ComponentType] = Inventory[ComponentType]+1
-        if (Inventory[ComponentType]>=BaseStockLevel[ComponentType]){
-          EventTime[event]=1e5
-          if (Clock>WarmUp){ TotalCost=TotalCost+(Clock-OldClock)* sum(OldInventory*HoldingCost) }
-        }
-      }
-    }
-    fn = (TotalProfit-TotalCost)/(TotalTime-WarmUp);
-    fnSum = fnSum + fn;
-  }
-  
-  fnAvg = fnSum / runlength
-  
-  return(fnAvg)
-}
-
-old_Build_ATO_TestFun = function(seed, numtestseeds=50){
-  trainseed = seed*10000 + numtestseeds
-  testseeds = seed*10000 + 1:numtestseeds
-  
-  
-  
-  TestFun_i = function(xs){
-    # the "TruePerf" is when seed=0
-    if(xs[9]==0){
-      Test_outputs = sapply(testseeds, function(si)RunATO(xs[1:8], seed=si))
-      return(mean(Test_outputs))
-      
-    } else if (xs[9]>0){
-      return( RunATO(xs[1:8], seed=trainseed+xs[9]) )
-    }
-  }
-  
-  TestFun = function(xs){
-    xs = Check_X(xs, 8, T, "ATO TestFun")
-    apply(xs, 1, TestFun_i)
-  }
-  
-  return(TestFun)
-}
-
-Build_Xie_ATO_Testfun = function(seed=1, numtestseeds=50, runlength=5){
-  
-  trainseed = seed*10000 + numtestseeds
-  testseeds = seed*10000 + 1:numtestseeds
-  
-  # price, holding cost, avg prod time, std prod time, capacity
-  items = c(  1,      2,      .15,   .0225,   20,
-              2,      2,      .40,    .06,    20,
-              3,      2,      .25,    .0375,  20,
-              4,      2,      .15,    .0225,  20,
-              5,      2,      .25,    .0375,  20,
-              6,      2,      .08,    .012,   20,
-              7,      2,      .13,    .0195,  20,
-              8,      2,      .40,    .06,    20)
-  items = matrix(items, 8, 5, byrow=T)
-  
-  products = c( 3.6,    1,  0,  0,  1,  0,  1,  1,  0,
-                3,      1,  0,  0,  0,  1,  1,  1,  0,
-                2.4,    0,  1,  0,  1,  0,  1,  0,  0,
-                1.8,    0,  0,  1,  1,  0,  1,  0,  1,
-                1.2,    0,  0,  1,  0,  1,  1,  1,  0)
-  products = matrix(products, 5, 9, byrow=T)
-  
-  # Both matrices as defined in problem statement
-  
-  # Any proposed solution must satisfy bk<=ck
-  nItems = nrow(items)
-  nProducts=5;
-  numberkey=6;
-  numbernk=nItems-numberkey;            # Num of products, key items and non key items respectively.
-  Tmax=70                                         #Length of simulation
-  
-  
-  
-  nGen = 10*Tmax*round(sum(products[,1])) # upper bound on number of generated outputs
-  
-  Simulate = function(x, seed){
-    
-    Profit=rep(0, runlength);
-    ProfitAfter20= rep(0, runlength);
-    set.seed(seed)
-    bk = round(x)
-    
-    # Set the substream to the "seed"
-    # ArrivalStream.Substream = seed;
-    # ProductionKeyStream.Substream = seed;
-    # ProductionNonKeyStream.Substream = seed;
-    
-    # Generate random data
-    # OldStream = RandStream.setGlobalStream(ArrivalStream); # Temporarily store old stream
-    
-    # Arrival=zeros(nProducts,nGen,runlength);
-    Arrival = array(0, dim=c(nProducts, nGen, runlength))
-    #Generate time of next order arrival per product
-    for (k in 1:nProducts) Arrival[k,,]= -log(runif(nGen*runlength))*(1/products[k,1]) # exprnd(1/products[k,1],1,nGen,runlength);
-    
-    
-    
-    # Generate production times
-    # RandStream.setGlobalStream(ProductionKeyStream);
-    ProdTimeKey= matrix(rnorm(nGen*runlength), nGen, runlength) #normrnd(0,1,nGen,runlength);
-    
-    # Generate Uniforms used to generate orders
-    # RandStream.setGlobalStream(ProductionNonKeyStream);
-    ProdTimeNonKey= matrix(rnorm(nGen*runlength), nGen, runlength) #normrnd(0,1,nGen,runlength);
-    
-    # Restore old random number stream
-    # RandStream.setGlobalStream(OldStream);
-    
-    for (k in 1:runlength){
-      # Initialize this replication
-      Inventory = bk;   # Tracks available inventory for each item
-      Orders    = Arrival[,1,k] # Next order arrival times
-      
-      
-      # ItemAvailability contains the time at which a replenishment order for a
-      # given item(row) will be ready. Each order replenishes one unit of
-      # one item.
-      
-      itemAvail = lapply(1:nItems, function(a)0)
-      A = rep(2, nProducts) # indeces ticking through each row of Arrival (times)
-      prevMinTime=0      #Holds the time of previous order fulfilled (to calculate holding cost)
-      p=1 # Index for Key item production times
-      q=1 # Index for non-Key production times
-      
-      # Main simulation:
-      #**** Loop through orders, as they happened (smallest time first) and identify ****
-      #**** whether key and non-key items are available, calculate profit, etc.      ****
-      
-      # While there are orders to be satisfied.
-      while(min(Orders)<=Tmax){
-        # find next order to satisfy and when it happens
-        minTime = min(Orders)
-        minProd = which.min(Orders)
-        
-        # generate time of next order and iterate the Arrival time 'A' index
-        Orders[minProd] = Orders[minProd] + Arrival[minProd, A[minProd], k]
-        A[minProd] = A[minProd] + 1
-        
-        # Add inventory that have become available upto minTime
-        Inventory = Inventory + sapply(itemAvail, function(ir)sum(0<ir&ir<=minTime))
-        itemAvail = lapply(itemAvail, function(ir)ir[ir>minTime])
-        
-        # if(all key items available) make product, etc
-        keyavail = all(products[minProd, 1+1:numberkey]<=Inventory[1:numberkey])
-        
-        
-        
-        ##################################################################################################
-        ##################################################################################################
-        ##################################################################################################
-        
-        
-        if(keyavail){ # all key items available
-          
-          Profit[k] = Profit[k] + sum(products[minProd,1+1:numberkey]*items[1:numberkey,1])
-          
-          if(minTime>=20)ProfitAfter20[k] = ProfitAfter20[k] + sum(products[minProd,1+1:numberkey]*items[1:numberkey,1]);
-          
-          for (r in 1:numberkey){
-            # Decrease inventory and place replenishment orders for the amount of key items used
-            num = products[minProd,r+1]
-            if (num!=0){
-              Inventory[r]=Inventory[r]-num;
-              for (g in 1:num){
-                tt = length(itemAvail[[r]])
-                itemAvail[[r]][tt+1] = max(minTime,itemAvail[[r]][tt]) +(items[r,3] + items[r,4]*ProdTimeKey[p,k])
-                p=p+1
-              }
-            }
-          }
-          
-          # For each non-key item available, use it, decrease inventory, increase profit and place replenishment order.
-          for (j in 1:numbernk){
-            r   = numberkey +j
-            num = products[minProd,r+1]
-            
-            if(num<=Inventory[r] && num!=0){
-              
-              Profit[k]=Profit[k]+items[r,1]*num;
-              if(minTime>=20) ProfitAfter20[k]=ProfitAfter20[k]+items[r,1]*num
-              
-              Inventory[r] = Inventory[r]-num
-              for (g in 1:num){
-                tt = length(itemAvail[[r]])
-                itemAvail[[r]][tt+1]=max(minTime,itemAvail[[r]][tt])+(items[j+numberkey,4]*ProdTimeNonKey[q,k]+items[j+numberkey,3])
-                q=q+1;
-              }
-            }
-          }
-          
-          # itemAvailability updated and resized!
-        }
-        
-        
-        ##################################################################################################
-        ##################################################################################################
-        ##################################################################################################
-        
-        
-        
-        Profit[k]=Profit[k]-sum(Inventory*items[,2])*(minTime-prevMinTime);
-        if(minTime>=20) ProfitAfter20[k] = ProfitAfter20[k]-sum(Inventory*items[,2])*(minTime-prevMinTime);
-        
-        prevMinTime=minTime;
-      }
-    }
-    
-    dailyProfitAfter20 = ProfitAfter20/(Tmax-20);
-    fn    = mean(dailyProfitAfter20);
-    FnVar = var(dailyProfitAfter20)/runlength;
-    # print(fn)
-    
-    fn
-  }
-  
-  TestFun_i = function(xs){
-    # the "TruePerf" is when seed=0
-    if(any(xs[1:8]<0) | any(20<xs[1:8]))stop("Xie ATO x is out of bounds") 
-    
-    if(xs[9]==0){
-      Test_outputs = sapply(testseeds, function(si)Simulate(x=xs[1:8], seed=si))
-      return(mean(Test_outputs))
-      
-    } else if (xs[9]>0){
-      return( Simulate(xs[1:8], seed=trainseed+xs[9]) )
-    }
-  }
-  
-  TestFun = function(xs){
-    xs = Check_X(xs, 8, T, "Xie ATO TestFun")
-    apply(xs, 1, TestFun_i)
-  }
-  
-  return(TestFun)
-  
-}
-
-Build_Xie_ATO_cpp_Testfun_old = function(baseseed=1, numtestseeds=200, runlength=5){
-  items = c(  1,      2,      .15,   .0225,   20,
-              2,      2,      .40,    .06,    20,
-              3,      2,      .25,    .0375,  20,
-              4,      2,      .15,    .0225,  20,
-              5,      2,      .25,    .0375,  20,
-              6,      2,      .08,    .012,   20,
-              7,      2,      .13,    .0195,  20,
-              8,      2,      .40,    .06,    20)
-  items = matrix(items, 8, 5, byrow=T)
-  
-  products = c( 3.6,    1,  0,  0,  1,  0,  1,  1,  0,
-                3,      1,  0,  0,  0,  1,  1,  1,  0,
-                2.4,    0,  1,  0,  1,  0,  1,  0,  0,
-                1.8,    0,  0,  1,  1,  0,  1,  0,  1,
-                1.2,    0,  0,  1,  0,  1,  1,  1,  0)
-  products  = matrix(products, 5, 9, byrow=T)
-  Tmax      = 70
-  nProducts = 5
-  nGen      = 10*Tmax*round(sum(products[,1]))
-  
-  Make_Stream = function(s, runlength, baseseed){
-    cat("calling makestream\n")
-    set.seed(1000*baseseed+s)
-    Arrival = array(0, dim=c(runlength, nProducts, nGen))
-    for (k in 1:nProducts) Arrival[,k,]= -log(runif(nGen*runlength))*(1/products[k,1]) 
-    
-    ProdTimeKey= matrix(rnorm(nGen*runlength), runlength, nGen)
-    ProdTimeNonKey= matrix(rnorm(nGen*runlength), runlength, nGen)
-    
-    list(Arrival=Arrival, ProdTimeKey=ProdTimeKey, ProdTimeNonKey=ProdTimeNonKey, runlength=runlength)
-  }
-  
-  RV = lapply(1:10001, function(a)NULL)
-  RV[[1]] = Make_Stream(0, numtestseeds*runlength, baseseed)
-  
-  simcalls = 0
-  
-  TestFun_i = function(xs){
-    
-    ss = xs[9]+1
-    # Generate new RNG streams
-    # if(length(RV)< ss){
-    #   RV[[ss]] <<- Make_Stream(ss, runlength, baseseed)
-    # }else 
-    if(is.null(RV[[ss]])){
-      cat(ss, is.null(RV[[ss]]), "\n")
-      RV[[ss]] <<- Make_Stream(ss, runlength, baseseed)
-      # RV <<- RV
-    }
-    
-    out = sapply(1:RV[[ss]]$runlength, function(k){
-      simcalls <<- simcalls+1
-      Simulate_ATO(
-            xs[1:8], 
-            RV[[ss]]$Arrival[k,,], 
-            RV[[ss]]$ProdTimeKey[k,], 
-            RV[[ss]]$ProdTimeNonKey[k,], 
-            items, 
-            products)})
-    return(mean(out))
-  }
-  
-  TestFun = function(xs){
-    xs = Check_X(xs, 8, T, "ATO cpp")
-    out = 1:nrow(xs)
-    for(i in 1:nrow(xs))out[i] = TestFun_i(xs[i,])
-    # cat("\n",length(RV))
-    out
-  }
-  
-  Get_RV = function() RV
-  
-  Get_simcalls = function()simcalls
-  
-  c(TestFun, Get_RV, Get_simcalls)
-}
-
-Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=500, runlength=5){
-  items = c(  1,      2,      .15,   .0225,   20,
-              2,      2,      .40,    .06,    20,
-              3,      2,      .25,    .0375,  20,
-              4,      2,      .15,    .0225,  20,
-              5,      2,      .25,    .0375,  20,
-              6,      2,      .08,    .012,   20,
-              7,      2,      .13,    .0195,  20,
-              8,      2,      .40,    .06,    20)
-  items = matrix(items, 8, 5, byrow=T)
-  
-  products = c( 3.6,    1,  0,  0,  1,  0,  1,  1,  0,
-                3,      1,  0,  0,  0,  1,  1,  1,  0,
-                2.4,    0,  1,  0,  1,  0,  1,  0,  0,
-                1.8,    0,  0,  1,  1,  0,  1,  0,  1,
-                1.2,    0,  0,  1,  0,  1,  1,  1,  0)
-  products  = matrix(products, 5, 9, byrow=T)
-  Tmax      = 70
-  nProducts = 5
-  nGenA     = 5*Tmax*round(max(products[,1]))
-  nGen      = 5*Tmax*round(sum(products[,1]))
-  
-  Make_Stream = function(s, runlength, baseseed){
-    # cat("calling makestream\n")
-    set.seed(1000*baseseed+s)
-    Arrival = lapply(1:runlength, function(i){
-      t(sapply(1:nProducts, function(k) -log(runif(nGenA))*(1/products[k,1])))
-    })
-    ProdTimeKey= lapply(1:runlength, function(i)rnorm(nGen))
-    ProdTimeNonKey= lapply(1:runlength, function(i)rnorm(nGen))
-    
-    list(Arrival=Arrival, ProdTimeKey=ProdTimeKey, ProdTimeNonKey=ProdTimeNonKey, runlength=runlength)
-  }
-  
-  # RV = lapply(1:10001, function(a)NULL)
-  TestStreams = Make_Stream(0, numtestseeds*runlength, baseseed)
-  
-  simcalls = 0
-  
-  TestFun_i = function(xs){
-    
-    if(xs[9]==0){
-      RV = TestStreams
-    }else{
-      # Generate new RNG streams
-      RV = Make_Stream(xs[9], runlength, baseseed)
-    }
-    
-    out = sapply(1:RV$runlength, function(k){
-      simcalls <<- simcalls+1
-      Simulate_ATO(
-        xs[1:8], 
-        RV$Arrival[[k]], 
-        RV$ProdTimeKey[[k]], 
-        RV$ProdTimeNonKey[[k]], 
-        items, 
-        products)})
-    return(mean(out))
-  }
-  
-  TestFun = function(xs){
-    cat("\nRunning ATO sim...")
-    if (is.null(dim(xs)))xs=matrix(xs,1)
-    xs = Check_X(xs, 8, T, "ATO cpp")
-    out = 1:nrow(xs)
-    for(i in 1:nrow(xs))out[i] = TestFun_i(xs[i,])
-    cat("done, ")
-    out
-  }
-  
-  Get_RV = function() TestStreams
-  
-  Get_simcalls = function()simcalls
-  
-  c(TestFun, Get_RV, Get_simcalls)
-  # TestFun
-}
-
-Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5){
- 
-  simcalls = 0 
-  Make_Stream = function(s, runlength, baseseed){
-    # cat("calling makestream\n")
-    set.seed(10000*baseseed+s)
-    
-    NumCalls = 30
-    
-    CallTimes = lapply(1:runlength, function(r)cumsum( rexp(NumCalls, rate = 1/60) ))
-    
-    CallLocs  = lapply(1:runlength, function(r){
-      CallLocs_r = matrix(0, 0, 2)
-      while (nrow(CallLocs_r)<NumCalls){
-        Calls = round(2*( NumCalls - nrow(CallLocs_r) ))
-        u = matrix(runif(3*Calls), Calls, 3)
-        Acc = 1.6*u[,3] <= 1.6 - abs(u[,1]-0.8) - abs(u[,2]-0.8)
-        CallLocs_r = rbind(CallLocs_r, u[Acc, 1:2])
-      }
-      CallLocs_r = CallLocs_r[1:NumCalls,]
-    })
-    
-    Stimes    = lapply(1:runlength, function(r)rgamma(NumCalls, shape=9, scale = 1/12))
-    
-    list(CallTimes=CallTimes, CallLocs=CallLocs, Stimes=Stimes, runlength=runlength)
-    
-  }
-  
-  TestStreams = Make_Stream(0, numtestseeds*runlength, baseseed)
-  
-  TestFun_i = function(xs){
-    
-    if(xs[7]==0){
-      RV = TestStreams
-    }else{
-      # Generate new RNG streams
-      RV = Make_Stream(xs[7], runlength, baseseed)
-    }
-    
-    xs = matrix(xs[1:6], 3,2)*0.05
-    
-    simcalls <<- simcalls + RV$runlength
-    
-    out = sapply(1:RV$runlength, function(k){
-      Ambulances_Square(xs, RV$CallTimes[[k]], RV$CallLocs[[k]], RV$Stimes[[k]])
-      })
-    return(-mean(out))
-  }
-  
-  TestFun = function(xs){
-    cat("\nRunning Ambulance sim...")
-    if (is.null(dim(xs)))xs = matrix(xs, 1)
-    xs = Check_X(xs, 6, T, "Ambulance cpp")
-    out = 1:nrow(xs)
-    for(i in 1:nrow(xs))out[i] = TestFun_i(xs[i,])
-    cat("done, ")
-    out
-  }
-  
-  Get_RV = function() TestStreams
-  
-  Get_simcalls = function()simcalls
-  
-  c(TestFun, Get_RV, Get_simcalls)
-  # TestFun
-}
-
-Build_ATO_TestFun = function(seed, numtestseeds=50, runlength=5){
-  
-  trainseed = seed*10000 + numtestseeds
-  testseeds = seed*10000 + 1:numtestseeds
-  
-  
-  # Args:
-  #   BaseStockLEvel: target stock quantities for each product
-  #   runlength: integer, repetitions of the simulation
-  #   seed: integer, to force deterministic simulation
-  #
-  # Returns:
-  #   fnAvg: Average profit over runlength reps of simulation
-  
-  NumComponentType=8;               #% number of component types
-  
-  ProTimeMean = c(0.15, 0.4, 0.25, 0.15, 0.25, 0.08, 0.13, 0.4)
-  ProTimeStd = 0.15*ProTimeMean
-  Profit = 1:8
-  HoldingCost = matrix(2, 1, NumComponentType)
-  # % holding cost of each component in
-  # % inventory
-  # 
-  # % Parameters of Customers
-  
-  ArrivalRate = 12             #% assume Possion arrival
-  iArrivalRate = 1/ArrivalRate
-  # %NumCustomerType=5;             % number of customer types
-  # %CustomerProb=[0.3,0.25,0.2,0.15,0.1];   % probability of each customer
-  KeyComponent=c(1,0,0,1,0,1,0,0,
-                 1,0,0,0,1,1,0,0,
-                 0,1,0,1,0,1,0,0,
-                 0,0,1,1,0,1,0,0,
-                 0,0,1,0,1,1,0,0)
-  KeyComponent = matrix(KeyComponent, nrow=5, byrow=TRUE)
-  
-  NonKeyComponent=c(0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,0,0,
-                    0,0,0,0,0,0,0,1,
-                    0,0,0,0,0,0,1,0)
-  
-  NonKeyComponent = matrix(NonKeyComponent, nrow=5, byrow=TRUE)
-  
-  WarmUp = 20
-  TotalTime = 70
-  
-  Simulate = function(BaseStockLevel=rep(1,8), seed=1){
-    # BaseStockLevel = floor(BaseStockLevel)
-    #% Simulation
-    fnSum = 0.0
-    set.seed(seed)
-    Customer_series = sample(size=TotalTime*ArrivalRate*runlength*4, 1:5, prob=c(0.3,0.25,0.2,0.15,0.1), replace=T)
-    t = 1
-    
-    for (k in 1:runlength){
-      
-      # runif_preset = runif()
-      
-      EventTime = matrix(1e5, 1, 1+NumComponentType)
-      EventTime[1] = -log(runif(1))*iArrivalRate
-      TotalProfit = 0
-      TotalCost = 0
-      Inventory = ceiling(BaseStockLevel)
-      
-      Clock = 0
-      
-      while (Clock<TotalTime){
-
-        OldInventory = Inventory
-        OldClock = Clock
-        Clock = min(EventTime)
-        event = which.min(EventTime)
-        if (event==1){ # a customer has come!
-          # Reset clock
-          EventTime[1]=Clock-log(runif(1))*iArrivalRate
-          
-          # Get new customer
-          CustomerType = Customer_series[t]
-          t=t+1
-          
-          KeyOrder = KeyComponent[CustomerType,]
-          NonKeyOrder = NonKeyComponent[CustomerType,]
-          
-          Sell = all(Inventory>=KeyOrder)
-          NonKeyOrder = Inventory * (Inventory<=NonKeyOrder) + NonKeyOrder*(Inventory>NonKeyOrder)
-          
-          if (Sell){
-            Inventory = Inventory - KeyOrder - NonKeyOrder
-            if (Clock>WarmUp){ TotalProfit = TotalProfit + sum(Profit*(KeyOrder + NonKeyOrder)) }
-            
-            for (i in 1:NumComponentType){
-              if (Inventory[i]<BaseStockLevel[i]  && EventTime[i+1]>1e4){
-                EventTime[i+1] = Clock + max(0,ProTimeMean[i]+rnorm(1)*ProTimeStd[i])
-              }
-            }
-            # reset = ((Inventory<BaseStockLevel)  & (EventTime[-1]>1e4))
-            # new_times = rnorm(sum(reset), ProTimeMean[reset], ProTimeStd[reset])
-            # EventTime[-1][reset] = Clock + new_times*(new_times>0) #max(0,ProTimeMean[i]+rnorm(1)*ProTimeStd[i])
-          }
-          
-          
-        }else{ # stock has arrived
-          ComponentType = event-1;
-          Inventory[ComponentType] = Inventory[ComponentType]+1
-          if (Inventory[ComponentType]>=BaseStockLevel[ComponentType]){
-            EventTime[event]=1e5
-            if (Clock>WarmUp){ TotalCost=TotalCost+(Clock-OldClock)* sum(OldInventory*HoldingCost) }
-          }
-        }
-      }
-      fn = (TotalProfit-TotalCost)/(TotalTime-WarmUp);
-      fnSum = fnSum + fn;
-    }
-    
-    fnAvg = fnSum / runlength
-    
-    return(fnAvg)
-  }
-  
-  TestFun_i = function(xs){
-    # the "TruePerf" is when seed=0
-    if(any(xs[1:8]<0) | any(20<xs[1:8]))stop("ATO x is out of bounds") 
-    
-    if(xs[9]==0){
-      Test_outputs = sapply(testseeds, function(si)Simulate(xs[1:8], seed=si))
-      return(mean(Test_outputs))
-      
-    } else if (xs[9]>0){
-      return( Simulate(xs[1:8], seed=trainseed+xs[9]) )
-    }
-  }
-  
-  TestFun = function(xs){
-    xs = Check_X(xs, 8, T, "ATO TestFun")
-    apply(xs, 1, TestFun_i)
-  }
-  
-  # return(TestFun)
-  return(TestFun)
-  
-}
-
-Build_GP_TestFun = function(seed, dims, TPars){
-  # Args:
-  #   seed: the fixed random number generator seed
-  #   dims: dimension of decision variable
-  #   TPars: 5 hyperparams, dims*L_theta, S_theta, dims*L_eps, S_eps, C_eps
-  #
-  # Returns:
-  #   TestFun: a function that takes continuous input and a seed, returns scalar
-  
-  ThetaFuns    = GenFun(LX=rep(TPars[1],dims), SS2=TPars[2], SC2=0, seed=1000*seed)
-  Theta        = ThetaFuns$fun
-  EPS          = lapply(1:500, function(i)GenFun(LX = rep(TPars[3], dims), SS2 = TPars[4], SC2=TPars[5], seed = seed*1000+i)$fun)
-  
-  DD = 1:dims
-  SS = dims+1
-  
-  TestFun_i = function(xsi) Theta(xsi[DD]) + if(xsi[SS]>0&xsi[SS]<=length(EPS)) EPS[[xsi[SS]]](xsi[DD]) else 0
-  
-  TestFun  = function(xs){
-    xs = Check_X(xs, dims, T, "GP TestFun")
-    apply(xs, 1, TestFun_i)
-  }
-
-  return(list(fun=TestFun, grad=ThetaFuns$dfun))
-}
-
-ATO_uniformbase = function(b, seed=10){
-  sapply(b, function(bi)RunATO(rep(bi, 8), runlength = 1, seed=seed))
-  # mean(results)
-}
-
-Get_performance = function(b=rep(1,8), testseeds=-1:-20){
-  seed_fun = function(s)sum(RunATO(b, seed=s))
-  result = mean(sapply(testseeds, seed_fun))
-  return(result)
-}
-
-########################################################################################################
-
-Build_Discrete_GP_CompSph = function(seed, dims, TPars){
-  # Args:
-  #   seed: the fixed random number generator seed
-  #   dims: dimension of decision variable
-  #   TPars: 4 hyperparams, dims*L_theta, S_theta, S_eps, C_eps
-  #
-  # Returns:
-  #   TestFun: a function that takes continuous input and a seed, returns scalar
-  
-  ThetaFuns    = GenFun(LX=rep(TPars[1],dims), SS2=TPars[2], SC2=0, seed=1000*seed)
-  Theta        = ThetaFuns$fun
-  offsets      = c(0, rnorm(1000)) * sqrt(TPars[length(TPars)])
-  noises       = c(0, rep(1, 1000)) * sqrt(TPars[length(TPars)-1])
-  
-  DD = 1:dims
-  SS = dims+1
-  
-  TestFun_i = function(xsi) {
-    s = xsi[length(xsi)]
-    s = (s-1)%%1000 + 1
-    xsi[length(xsi)] = s
-    Theta(xsi[DD]) + rnorm(1, offsets[xsi[SS]+1], noises[xsi[SS]+1])
-  }
-  
-  TestFun  = function(xs){
-    xs = Check_X(xs, dims, T, "GP Disc TestFun")
-    apply(xs, 1, TestFun_i)
-  }
-  
-  return(list(fun=TestFun, grad=ThetaFuns$dfun))
-}
-
-Build_Discrete_GP_CompSph2 = function(seed, TPars){
-  # Args:
-  #   seed: the fixed random number generator seed
-  #   TPars: 4 hyperparams, L_theta, S_theta, S_eps, C_eps
-  #
-  # Returns:
-  #   TestFun: a function that takes continuous input and a seed, returns scalar
-  
-  LX = TPars[1:(length(TPars)-3)]
-  dims = length(LX)
-  SS2 = TPars[length(TPars)-2]
-  
-  ThetaFuns    = GenFun(LX=LX, SS2=SS2, SC2=0, seed=1000*seed)
-  Theta        = ThetaFuns$fun
-  noises       = c(0, rep(1, 10000)) * sqrt(TPars[length(TPars)-1])
-  offsets      = c(0, rnorm(10000)) * sqrt(TPars[length(TPars)])
-  
-  DD = 1:dims
-  SS = dims+1
-  
-  TestFun_i = function(xsi) {
-    s = xsi[length(xsi)]
-    Theta(xsi[DD]) + rnorm(1, offsets[s+1], noises[s+1])
-  }
-  
-  TestFun  = function(xs){
-    xs = Check_X(xs, dims, T, "GP Disc TestFun")
-    apply(xs, 1, TestFun_i)
-  }
-  
-  return(list(fun=TestFun, grad=ThetaFuns$dfun))
-}
-
-
-Build_Matlab_ATO = function(BOseed, numtestseeds=100, runlength1=5, HN1=F){
-  
-  # stop("gotta do some sanity checking to see this works as expected!")
-  BaseSeed = 10000*BOseed
-  
-  Matlab_ATO = function(x, runlength, path_to_ATO_batch="/home/maths/phrnaj/ATO", HN=HN1){
-    
-    folder = getwd()
-    if(is.null(dim(x))&length(x)==9) x = matrix(x,1)
-    
-    out_fname = tempfile(fileext = ".txt")
-    mat_fname = tempfile(fileext = ".m")
-    
-    row_str = sapply(1:nrow(x), function(a)paste(x[a,],collapse=","))
-    mat_str = paste(row_str, collapse="; ")
-    
-    runl_str = paste(runlength, collapse=",")
-    
-    if(HN){
-      code = paste( "cd('",path_to_ATO_batch,"'); \np=ATOHongNelson_batch([", mat_str, "],[",runl_str,"]); \nsave('",out_fname,"','p','-ascii')", sep="")
-    }else{
-      code = paste( "cd('",path_to_ATO_batch,"'); \np=ATO_batch([", mat_str, "],[",runl_str,"]); \nsave('",out_fname,"','p','-ascii')", sep="")
-    }
-    write(code, mat_fname)
-    
-    exec1 = "matlab  -nojvm -nodesktop -nosplash -nodisplay -r  \"try, run('"
-    exec2 = "'); catch err, disp(err.message); exit(1); end; exit(0);\""
-    full_exec = paste(exec1, mat_fname, exec2, sep="")
-    
-    cat("calling MATLAB...")
-    system(full_exec, wait=T, ignore.stdout=T)
-    cat("done, ")
-    as.numeric(readLines(out_fname))
-  }
-  
-  TestFun = function(x){
-    x = Check_X(x,8,T,"matlab ATO")
-    
-    runl = (1 + (x[,9]==0)*(numtestseeds-1)) * runlength1
-    
-    x[,9] = x[,9] + BaseSeed
-    
-    output = Matlab_ATO(x, runl)
-      
-    return(output)
-    
-  }
-  
-  return(TestFun)
-  
-}
-
-
-
-cat("\nLoaded CRNMay2018.R\n\n")
+cat(" Loaded CRNMay2018.R\n\n")
 
 
