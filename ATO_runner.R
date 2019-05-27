@@ -10,16 +10,16 @@ if(!debug)cat(CPU,"\n\n", commandArgs(), "\n\n")
 
 
 if(debug){
-  if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/")
-  else if (grepl("Book", CPU)) setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/")
-  else setwd("/Users/pearce/CRN/")
+  if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/git_CRN/")
+  else if (grepl("Book", CPU)) setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/git_CRN/")
+  else setwd("/Users/pearce/CRN/git_CRN/")
   cat(getwd(),"\n\n")
   # system("cp ../CRNMay2018.R ./", wait=T)
 }
 
 
-source('CRNMay2018.R')
-source('TestFuns.R')
+source('CRN_BO/CRNMay2018.R')
+source('TestFuns/TestFuns.R')
 
 
 #############################################################################################

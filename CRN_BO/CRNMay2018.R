@@ -5,9 +5,9 @@ library(R6)
 library(FastGP)
 library(mcmc)
 
-source('utils.R')
+source('CRN_BO/utils.R')
 
-Rcpp::sourceCpp('kernel.cpp')
+Rcpp::sourceCpp('CRN_BO/kernel.cpp')
 
 cat(" kernel.cpp compilation complete. ")
 
@@ -1225,9 +1225,10 @@ cat(" kernel.cpp compilation complete. ")
         if (is.null(Hpars) | (length(Hpars)!=2*self$dims+4) | any(Hpars<0)) stop("cannot set hpars to NULL")
         self$HP = Hpars
       }
+      
       V2 = self$HP[length(self$HP)]
       
-      self$iK  = rcppeigen_invert_matrix( self$kernel(self$xd,self$xd) + V2*diag(length(self$yd)) )
+      self$iK  = rcppeigen_invert_matrix( self$kernel(self$xd,self$xd) )
       self$iKY = self$iK%*%self$ydm
       self$Hpar_History[[length(self$yd)]] = self$HP
       

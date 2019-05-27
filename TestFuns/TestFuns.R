@@ -496,7 +496,7 @@ Build_Xie_ATO_Testfun = function(seed=1, numtestseeds=50, runlength=5){
 }
 
 Build_Xie_ATO_cpp_Testfun_old = function(baseseed=1, numtestseeds=200, runlength=5){
-  Rcpp::sourceCpp('ATO.cpp')
+  Rcpp::sourceCpp('TestFuns/ATO.cpp')
   items = c(  1,      2,      .15,   .0225,   20,
               2,      2,      .40,    .06,    20,
               3,      2,      .25,    .0375,  20,
@@ -575,7 +575,7 @@ Build_Xie_ATO_cpp_Testfun_old = function(baseseed=1, numtestseeds=200, runlength
 }
 
 Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=500, runlength=5){
-  Rcpp::sourceCpp('ATO.cpp')
+  Rcpp::sourceCpp('TestFuns/ATO.cpp')
   items = c(  1,      2,      .15,   .0225,   20,
               2,      2,      .40,    .06,    20,
               3,      2,      .25,    .0375,  20,
@@ -880,7 +880,7 @@ Build_GP_TestFun = function(seed, dims, TPars){
 # Ambulance
 
 Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5){
-  Rcpp::sourceCpp('Ambulances.cpp')
+  Rcpp::sourceCpp('TestFuns/Ambulances.cpp')
   cat(" Ambulances.cpp compilation complete. ")
   
   simcalls = 0 
