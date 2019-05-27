@@ -225,7 +225,7 @@ cat(" kernel.cpp compilation complete. ")
     SX_PriorPrec = NULL,
     NV_PriorRate = NULL,
     lhood_term3  = NULL,
-    copula       = NULL,
+    copula       = FALSE,
     
     initialize = function(xd, yd, XRAN, copula=F){
       
@@ -1339,7 +1339,7 @@ cat(" kernel.cpp compilation complete. ")
       
       return(lapply(1:self$dims, function(d)DK[1:nrow(x1) + nrow(x1)*(d-1), ,drop=F]))
     },
-    MU   = function(x){
+    MU     = function(x){
       x = Check_X(x, self$dims, T, "MU")
       # x = matrix(x)
       self$ymean+self$kernel(x,self$xd)%*%self$iKY
@@ -1350,7 +1350,7 @@ cat(" kernel.cpp compilation complete. ")
       dKx = self$dkernel.dx1(cbind(xi,0), self$xd)
       lapply(dKx, function(dKx_i)dKx_i%*%self$iKY)
     },
-    COV  = function(x1,x2){
+    COV    = function(x1,x2){
       self$kernel(x1,x2) -self$kernel(x1,self$xd)%*%self$iK%*%self$kernel(self$xd,x2) },
     dCOV.dx1 = function(x1, x2, iKx2=NULL){
       if(is.null(iKx2))iKx2 = self$iK%*%self$kernel(self$xd, x2)

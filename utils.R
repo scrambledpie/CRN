@@ -3,7 +3,7 @@
 CPU = system("hostname",intern=T)
 
 # if (grepl("Book", CPU)){
-if (T){
+if (F){
   Check_X = function(x, dims, withseeds, fname){
     # Args
     #   x: input vec or matrix

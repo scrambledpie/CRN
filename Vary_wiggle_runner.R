@@ -21,7 +21,7 @@ if(debug){
 source('CRNMay2018.R')
 source('TestFuns.R')
 
-
+Rprof("tmpfile")
 #############################################################################################
 #############################################################################################
 
@@ -55,17 +55,17 @@ if(length(Args)>0){
   rho    = RHOS[myID]
   
   NOISE  = 50^2
-  TruePars = c(5, 100^2, 0.000001, (1-rho)*NOISE, rho*NOISE)
+  TruePars = c(5, 100^2, 5, rho*NOISE, 0, (1-rho)*NOISE)
   
 }else{
   
   cat("Running locally \n")
-  method = 5
+  method = 4
   BOseed = 1
   myID   = 1199
   Ns0    = 3
-  rho    = 0.8
-  TruePars = c(5, 100^2, 5, (1-rho)*50^2, rho*50^2)
+  rho    = 0
+  TruePars = c(5, 100^2, 5, rho*50^2, 0, (1-rho)*50^2)
 }
 
 Checkpoint = function(tryload=F){
@@ -127,22 +127,27 @@ Checkpoint = function(tryload=F){
 
 
 ####################################################
-X_domain = 1:100
+set.seed(BOseed)
 
+X_domain = 1:100
 SEkernel = function(x1,x2){
   TruePars[2]*exp(-0.5*outer(x1,x2,'-')^2/TruePars[1]^2)
 }
-
 X_f = X_domain
-set.seed(BOseed)
 Y_f = mvrnorm(1, rep(0,length(X_f)), SEkernel(X_f, X_f))
-Offs_f = sqrt(TruePars[5])*rnorm(200)
+
+SEkernelw = function(x1,x2){
+  TruePars[4]*exp(-0.5*outer(x1,x2,'-')^2/TruePars[3]^2)
+}
+Offs_f = mvrnorm(60, rep(0, length(X_f)), SEkernelw(X_f,X_f))
 
 TestFun = function(xs){
   
   
   TestFun_i = function(xs){
-    Y_f[xs[1]] + (xs[2]>0)*(Offs_f[xs[2]+1] + rnorm(1,0,sqrt(TruePars[4])))
+    eps = 0
+    if(xs[2]>0) eps=Offs_f[xs[2], xs[1]] + rnorm(1,0,sqrt(TruePars[6]))
+    Y_f[xs[1]] + eps
   }
   
   xs = matrix(xs, ncol=2)
@@ -151,31 +156,15 @@ TestFun = function(xs){
 
 XRAN    = matrix(range(X_domain), 2)
 
-# par(mfrow=c(1,1))
-# plot(c(0,100), c(-120,120), col="white")
-# X = 0:100
-# for(i in 0:3){
-#   Yi = TestFun(cbind(X, i))
-#   points(X, Yi, col=i+1, pch=19, cex=0.5)
-# }
+
 
 #######################################################
+# Iitialize the GP models
 
 Budget0 = 5
 
 Budget1 = 50
 # stop()
-
-
-
-
-
-
-N0 = function()length(GP1$yd)
-NS = function()length(unique(GP1$xd[,ncol(GP1$xd)]))
-
-# Otherwise initialize the GP models
-
 
 XX_init   = UniformDesign_X(N0=Budget0, ran=XRAN, Ns=3, TestFun=NULL, rounding=T, double=0) 
 YY_init   = TestFun(XX_init)
@@ -183,10 +172,10 @@ YY_init   = TestFun(XX_init)
 if(method%in%c(1, 2))  XX_init[,2] = 1:nrow(XX_init)
 
 GP1  = CRNLHood$new(XX_init, YY_init, XRAN)
+N0 = function()length(GP1$yd)
+NS = function()length(unique(GP1$xd[,ncol(GP1$xd)]))
 
 GP1$Refresh(learnHpars=7, Hpars=TruePars)
-
-# stop()
 
 
 RecX = list()
@@ -241,6 +230,7 @@ while(length(GP1$yd)<Budget1){
     if(method==2){
       newx = X_domain[ which.max(sapply(X_domain, PKG$KG)) ]
       newx = c(newx, max(GP1$xd[,2])+1 )
+      
     } else if(method==4){
       checkseeds = 1:(max(GP1$xd[,2])+1)
       KGvals = sapply(checkseeds, function(s)sapply(X_domain, function(xi)KG$KG(c(xi, s))))
@@ -274,7 +264,7 @@ while(length(GP1$yd)<Budget1){
     newy = TestFun(newx)
     
     GP1$xd   = rbind(GP1$xd, newx)
-    GP1$yd   = c(GP1$yd, newy)
+    GP1$yd_o   = c(GP1$yd_o, newy)
     
     GP1$Refresh(learnHpars=7, Hpars=TruePars)
     
@@ -313,8 +303,11 @@ while(length(GP1$yd)<Budget1){
   Checkpoint()
   
   cat("\n\n")
+  # stop()
 }
 
+Rprof()
+print(summaryRprof("tmpfile"))
 
 cat("Finished and saved", myID, "\n")
 
@@ -401,3 +394,8 @@ if(F){
 }
 
 
+YY = sapply(0:20, function(i)TestFun(cbind(X_domain, i)))
+plot(c(0,100), range(YY))
+for(i in 20:1){
+  lines(X_domain, YY[,i])
+}
