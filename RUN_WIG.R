@@ -1,4 +1,3 @@
-#!/usr/bin/
 
 Args = commandArgs(trailingOnly = T)
 
@@ -14,5 +13,5 @@ for(rho_i in 11:11){
   }
 }
 
-system(paste("rsync EachData1/ huanan:/home/michael/OPUS/wig/",Foldername,"/"))
-system(paste("rsync EachData1/ godzilla:/storage/maths/phrnaj/opus/wig/",Foldername,"/"))
+system(paste("rsync -rv EachData1/ huanan:/home/michael/OPUS/wig/",Foldername,"/", sep=""))
+system(paste("rsync -rv EachData1/ godzilla:/storage/maths/phrnaj/opus/wig/",Foldername,"/",sep=""))
