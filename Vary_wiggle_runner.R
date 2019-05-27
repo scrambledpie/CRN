@@ -172,7 +172,7 @@ XRAN    = matrix(range(X_domain), 2)
 
 Budget0 = 5
 
-Budget1 = 6
+Budget1 = 50
 
 
 XX_init   = UniformDesign_X(N0=Budget0, ran=XRAN, Ns=3, TestFun=NULL, rounding=T, double=0) 
