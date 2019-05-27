@@ -13,15 +13,15 @@ if(debug){
   if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/")
   else if (grepl("Book", CPU)) setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/")
   else setwd("/Users/pearce/CRN/")
-  cat(getwd(),"\n\n")
   # system("cp ../CRNMay2018.R ./", wait=T)
 }
 
+cat(getwd(),"\n\n")
 
 source('CRNMay2018.R')
 source('TestFuns.R')
 
-Rprof("tmpfile")
+# Rprof("tmpfile")
 #############################################################################################
 #############################################################################################
 
@@ -42,18 +42,24 @@ method_names = c("UNI MLE",
 if(length(Args)>0){
   # if(T){
   
-  reps = 800
-  Methods  = rep(rep(c(2, 4, 5),11), each=reps)
-  BOseeds  = rep(1:reps, len=length(Methods))
-  RHOS     = rep(seq(0,1,len=11), each=reps*3)
+  method = as.integer(Args[1])
+  rho    = seq(0,1,0.1)[as.integer(Args[2])]
+  BOseed = as.integer(Args[3])
   
-  myID     = as.numeric(Args[1])
+  myID = paste(Args, collapse = "_")
   
-  method = Methods[myID]
-  BOseed = BOseeds[myID]
+  # reps = 800
+  # Methods  = rep(rep(c(2, 4, 5),11), each=reps)
+  # BOseeds  = rep(1:reps, len=length(Methods))
+  # RHOS     = rep(seq(0,1,len=11), each=reps*3)
+  # 
+  # myID     = as.numeric(Args[1])
+  # 
+  # method = Methods[myID]
+  # BOseed = BOseeds[myID]
+  # rho    = RHOS[myID]
+  
   Ns0    = 3
-  rho    = RHOS[myID]
-  
   NOISE  = 50^2
   TruePars = c(5, 100^2, 5, rho*NOISE, 0, (1-rho)*NOISE)
   
@@ -126,7 +132,10 @@ Checkpoint = function(tryload=F){
 }
 
 
+cat("Method ", method, ", wiggle ", rho, ", seed ", BOseed, "\n")
+
 ####################################################
+# Make test function
 set.seed(BOseed)
 
 X_domain = 1:100
@@ -163,8 +172,8 @@ XRAN    = matrix(range(X_domain), 2)
 
 Budget0 = 5
 
-Budget1 = 50
-# stop()
+Budget1 = 15
+
 
 XX_init   = UniformDesign_X(N0=Budget0, ran=XRAN, Ns=3, TestFun=NULL, rounding=T, double=0) 
 YY_init   = TestFun(XX_init)
@@ -306,10 +315,12 @@ while(length(GP1$yd)<Budget1){
   # stop()
 }
 
-Rprof()
-print(summaryRprof("tmpfile"))
+# Rprof()
+# print(summaryRprof("tmpfile"))
 
-cat("Finished and saved", myID, "\n")
+cat("Finished and saved", myID, "###########################################\n")
+cat("Finished and saved", myID, "###########################################\n")
+cat("Finished and saved", myID, "###########################################\n\n\n")
 
 
 
@@ -391,11 +402,4 @@ if(F){
   NOracFile("~/CRN/WSC_1D_runner.R", 600)
   
   
-}
-
-
-YY = sapply(0:20, function(i)TestFun(cbind(X_domain, i)))
-plot(c(0,100), range(YY))
-for(i in 20:1){
-  lines(X_domain, YY[,i])
 }

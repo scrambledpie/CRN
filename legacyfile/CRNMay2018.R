@@ -1574,6 +1574,7 @@ KGCBfilter = function(a,b){
   
   if(all(abs(b)<0.000001))return(0)
 
+
   big = abs(b)>0.000001
   if(any(!big)){
     a   = c( a[big], max(a[!big]) )
@@ -1876,6 +1877,8 @@ Make_CRNKG_grad = function(CRNGP, Xr){
   V2 = 0 #CRNGP$HP[length(CRNGP$HP)]
   
   CRNKG = function(xs){
+    
+    if (any( apply(GP1$xd,1,function(xdi)all(abs(xdi-xs)<1e-8)) )) return(0)
     
     # repeats = apply(xs[D]==tXr, 2, all)
     # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
