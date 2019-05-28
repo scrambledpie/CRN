@@ -233,7 +233,7 @@ BO_KG = R6Class("BO_KG",
 BO_CRNKG_CS = R6Class("BO_CRNKG_CS",
   inherit = BO_base,
   public = list(
-    method = 4,
+    method = 8,
     optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
       
       # define a function that suggests the next x to evaluate
@@ -257,7 +257,7 @@ BO_CRNKG_CS = R6Class("BO_CRNKG_CS",
 BO_CRNKG_CSW = R6Class("BO_CRNKG_CSW",
   inherit = BO_base,
   public = list(
-    method = 6,
+    method = 9,
     optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
       
       # define a function that suggests the next x to evaluate

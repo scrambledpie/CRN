@@ -12,7 +12,7 @@ if(!debug){
   cat(getwd(),"\n\n")
   
   reps = 400
-  Methods = rep(c(2, 8, 9, 6, 7), each=reps)
+  Methods = rep(c(2, 4, 5, 6, 7), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   
   set.seed(1)
@@ -35,7 +35,7 @@ if(!debug){
   if (grepl("pearce", CPU)) setwd("/Users/pearce/CRN/")
   
   # Optimization Run
-  method   = 2
+  method   = 4
   BOseed   = 1
   Ns0      = 5
   Budget   = 25
@@ -53,12 +53,12 @@ source('CRN_BO/Optimizers.R')
 ALGORITHMS = c(1, 
                BO_KG, 
                1, 
-               BO_CRNKG_CS, 
+               BO_CRNKG_CS_allseeds, 
                BO_PWKG_CS, 
-               BO_CRNKG_CSW,
+               BO_CRNKG_CSW_allseeds,
                BO_PWKG_CSW,
-               BO_CRNKG_CS_allseeds,
-               BO_CRNKG_CSW_allseeds)
+               BO_CRNKG_CS,
+               BO_CRNKG_CSW)
 
 
 # exectute the optimizer
