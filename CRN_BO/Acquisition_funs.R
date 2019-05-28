@@ -9,6 +9,7 @@ KGCBcpp   = function(a, b){
   
   if(all(abs(b)<0.000001))return(0)
   
+  
   big = abs(b)>0.000001
   if(any(!big)){
     a   = c( a[big], max(a[!big]) )
@@ -456,6 +457,8 @@ Make_CRNKG_grad = function(CRNGP, Xr){
     
     MM   = c(Mr, CRNGP$MU(xs0))
     
+    if(any(is.nan(SIGT))) return(0)
+    
     O = KGCBfilter(MM, SIGT)
     
     O
@@ -694,6 +697,8 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     MM   = c(Mr, CRNGP$MU(xs01), CRNGP$MU(xs02))
     
     # browser()
+    
+    if(any(is.nan(SIGT))) return(0)
     
     O = 0.5 * KGCBfilter(MM, SIGT) * ratio
     

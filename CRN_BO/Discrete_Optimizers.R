@@ -127,12 +127,10 @@ BO_base_disc = R6Class("BO_base_disc",inherit = OptimizerBase,
       }
       return(loadsuccess)
     },
-    base_optimize = function(Budget0=5, Budget=50, get_next_x=NULL, Ns0=5, hypers=NULL){
+    base_optimize = function(Budget0=5, Budget=50, get_next_x=NULL, Ns0=3, hypers=NULL){
 
 
       if(is.null(get_next_x))stop("provide a get_next_x() function!")
-
-      OptimSteps = c(20:200, seq(205, 300, 5), seq(310, 400, 10), seq(420, 500, 20))
 
       loadsuccess = self$Checkpoint(tryload = T)
 
@@ -213,6 +211,7 @@ BO_KG_DISC = R6Class("BO_KG_DISC",
 
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
+        cat(" evaluating KG_DISC, ")
         Xr = cbind(self$X_domain, 0)
         KG = Make_PWKG_grad(self$GP, Xr)$KG
         newx = X_domain[ which.max(sapply(X_domain, KG)) ]
@@ -240,6 +239,7 @@ BO_CRNKG_DISC = R6Class("BO_CRNKG_DISC",
 
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
+        cat(" evaluating CRNKG_DISC, ")
         X_domain = self$X_domain
         Xr    = cbind(X_domain, 0)
         CRNKG = Make_CRNKG_grad(self$GP, Xr)$KG
@@ -271,6 +271,7 @@ BO_PWKG_DISC = R6Class("BO_PWKG_DISC",
 
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
+        cat(" evaluating PWKG_DISC, ")
         X_domain = self$X_domain
         Xr       = cbind(X_domain, 0)
         PKG      = Make_PWKG_grad(self$GP, Xr)
@@ -281,10 +282,12 @@ BO_PWKG_DISC = R6Class("BO_PWKG_DISC",
         if(max(KG_vals) > max(PW_vals)){
           newx = X_domain[ which.max( KG_vals )]
           newx = c(newx, max(self$GP$xd[,2])+1)
+          cat("best is single, ")
         }else{
           newx1 = X_domain[ which.max(apply(PW_vals,1,max)) ]
           newx2 = X_domain[ which.max(apply(PW_vals,2,max)) ]
           newx = cbind(c(newx1, newx2), max(self$GP$xd[,2])+1 )
+          cat("best is pair, ")
         }
         return(newx)
       }
