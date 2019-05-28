@@ -23,5 +23,6 @@ ADD RUN_AMBULANCES.sh /
 
 COPY CRN_BO /CRN_BO
 COPY legacyfile /legacyfile
+COPY TestFuns /TestFuns
 COPY *.R /
 
