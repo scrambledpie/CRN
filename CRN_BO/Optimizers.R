@@ -186,7 +186,7 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
         # Update the data and either do a full hpar update or just finetune
         self$GP$xd      = rbind(self$GP$xd, newx)
         self$GP$yd_o   = c(self$GP$yd_o, newy)
-        finetune        = N%in%OptimSteps
+        finetune        = !(N%in%OptimSteps)
         self$GP$Refresh(learnHpars = kk + finetune)
         fit_time        = proc.time()[3] - t0 - eval_time - KG_time
         
