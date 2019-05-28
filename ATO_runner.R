@@ -4,6 +4,8 @@ Args = commandArgs(trailingOnly = T)
 debug = length(Args)==0
 .libPaths(c(.libPaths(),"~/R/"))
 
+if(!length(Args)%in%c(0,2))stop("Give a jobID and Budget>20 as arguments")
+
 if(!debug){
   # Running from terminal
   cat(CPU,"\n\n", commandArgs(), "\n\n")
@@ -21,7 +23,8 @@ if(!debug){
   method = Methods[myID]
   BOseed = BOseeds[myID]
   Ns0 = 5
-  filename = paste(myID, "ATO", method, BOseed, collapse = "_")
+  Budget = as.integer(Args[2])
+  filename = paste(c(myID, "ATO", method, BOseed), collapse = "_")
   
 }else{
   # running within Rstudio
@@ -35,6 +38,7 @@ if(!debug){
   method   = 5
   BOseed   = 1
   Ns0      = 5
+  Budget   = 25
   filename = NULL
 }
 
@@ -59,5 +63,10 @@ ALGORITHMS = c(1,
 
 # exectute the optimizer
 AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=T)
-AA$optimize(Budget0 = 20, Budget = 25)
+AA$optimize(Budget0 = 20, Budget = Budget,
+            N0  = 1000, Na  = 10, maxevals  = 100,
+            PN0 = 4000, PNa = 20, Pmaxevals = 200)
 cat("Finished and Saved ", filename)
+
+
+  

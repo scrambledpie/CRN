@@ -211,7 +211,7 @@ BO_KG = R6Class("BO_KG",
   inherit = BO_base,
   public = list(
     method = 2,
-    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100){
+    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100, ...){
      
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
@@ -234,7 +234,7 @@ BO_CRNKG_CS = R6Class("BO_CRNKG_CS",
   inherit = BO_base,
   public = list(
     method = 4,
-    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100){
+    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
       
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
@@ -258,7 +258,7 @@ BO_CRNKG_CSW = R6Class("BO_CRNKG_CSW",
   inherit = BO_base,
   public = list(
     method = 6,
-    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100){
+    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
       
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
@@ -282,7 +282,7 @@ BO_CRNKG_CS_allseeds = R6Class("BO_CRNKG_CS_allseeds",
                       inherit = BO_base,
                       public = list(
                         method = 4,
-                        optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100){
+                        optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
                           
                           # define a function that suggests the next x to evaluate
                           get_next_x = function(){
@@ -306,7 +306,7 @@ BO_CRNKG_CSW_allseeds = R6Class("BO_CRNKG_CSW_allseeds",
   inherit = BO_base,
   public = list(
    method = 6,
-   optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100){
+   optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
      
      # define a function that suggests the next x to evaluate
      get_next_x = function(){

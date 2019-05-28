@@ -4,6 +4,8 @@ Args = commandArgs(trailingOnly = T)
 debug = length(Args)==0
 .libPaths(c(.libPaths(),"~/R/"))
 
+if(!length(Args)%in%c(0,2))stop("Give a jobID and Budget>20 as arguments")
+
 if(!debug){
   # Running from terminal
   cat(CPU,"\n\n", commandArgs(), "\n\n")
@@ -21,6 +23,7 @@ if(!debug){
   method = Methods[myID]
   BOseed = BOseeds[myID]
   Ns0 = 5
+  Budget = as.integer(Args[2])
   filename = paste(c(myID, "AMB", method, BOseed), collapse = "_")
   
 }else{
@@ -32,10 +35,11 @@ if(!debug){
   if (grepl("pearce", CPU)) setwd("/Users/pearce/CRN/")
   
   # Optimization Run
-  method   = 5
+  method   = 2
   BOseed   = 1
   Ns0      = 5
-  filename = "testingAMB1"
+  Budget   = 25
+  filename = NULL
 }
 
 # Make the TestFunction
@@ -59,7 +63,9 @@ ALGORITHMS = c(1,
 
 # exectute the optimizer
 AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
-AA$optimize(Budget0 = 20, Budget = 29)
+AA$optimize(Budget0 = 20, Budget = Budget,
+            N0  = 1000, Na  = 10, maxevals  = 100,
+            PN0 = 4000, PNa = 20, Pmaxevals = 200)
 cat("Finished and Saved ", filename)
 
 
