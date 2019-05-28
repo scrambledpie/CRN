@@ -268,8 +268,8 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     }
     self$SQ    = lapply(1:self$dims, function(d) -0.5*outer(self$xd[,d], self$xd[,d], "-")^2)
     self$Seeds = outer(self$xd[,ncol(self$xd)], self$xd[,ncol(self$xd)], "==")
-    self$ymean = mean(self$yd)
-    self$ydm   = self$yd - mean(self$yd)
+    # self$ymean = mean(self$yd)
+    self$ydm   = self$yd - self$ymean
     
     xtop = 1.5*(self$XRAN[2,]-self$XRAN[1,])
     ytop = 0.1*(max(self$yd)-min(self$yd))^2
@@ -1179,6 +1179,7 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
       self$ymean = ymean
     }
     
+    
     self$Seeds = outer(xd[,self$dims+1], xd[,self$dims+1], "==")
     self$ydm   = self$yd - self$ymean
     self$SQ    = lapply(1:self$dims, function(d)outer(xd[,d], xd[,d], "-")^2)
@@ -1236,7 +1237,7 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
       self$HP = Hpars
     }
     
-    V2 = self$HP[length(self$HP)]
+    
     
     self$iK  = rcppeigen_invert_matrix( self$kernel(self$xd,self$xd) )
     self$iKY = self$iK%*%self$ydm
