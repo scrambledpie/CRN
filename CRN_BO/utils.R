@@ -71,7 +71,7 @@ LHCran = function(N0, ran){
 Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, reltol=1e-8, maxevals=Inf){
   
   
-  cat("\n Na:", Na, ", N0: ", N0, ", maxevals: ",maxevals)
+  cat("\n Na:", Na, ", N0: ", N0, ", maxevals: ",maxevals, ",  ")
   # browser()
   # Function that maximizes f1 and returns argmax
   # 

@@ -252,7 +252,9 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
   Lhood_Prep = function(){
     cat("prepping Lhood, ")
     
-    self$LX_PriorMean = XRAN[2,] - XRAN[1,]
+    
+    
+    self$LX_PriorMean = self$XRAN[2,] - self$XRAN[1,]
     self$LX_PriorPrec = 0.25/(self$LX_PriorMean)^2
     
     self$SX_PriorMean = var(self$yd)
@@ -1310,7 +1312,7 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     # x1 = Check_X(x1, self$dims, T, "GP kernel x1")
     # x2 = Check_X(x2, self$dims, T, "GP kernel x2")
     
-    return(Rcpp_Kernel2(x1,x2,self$HP))
+    return(Rcpp_Kernel(x1, x2, self$HP))
   },
   dkernel.dx1_R = function(x1, x2){
     

@@ -650,6 +650,8 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=500, runlength=5){
   Get_simcalls = function()simcalls
   
   attr(TestFun, 'ran') = rbind(rep(0,8), rep(20,8))
+  attr(TestFun, 'name') = "ATO"
+  
   
   c(TestFun, Get_RV, Get_simcalls)
   # TestFun
@@ -945,6 +947,7 @@ Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5){
   Get_simcalls = function()simcalls
   
   attr(TestFun, 'ran') = rbind(rep(0,6), rep(20,6))
+  attr(TestFun, 'name') = "Ambulances"
   
   c(TestFun, Get_RV, Get_simcalls)
   # TestFun

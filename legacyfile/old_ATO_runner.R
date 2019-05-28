@@ -10,16 +10,16 @@ if(!debug)cat(CPU,"\n\n", commandArgs(), "\n\n")
 
 
 if(debug){
-  if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/")
-  else if (grepl("Book", CPU)) setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/")
-  else setwd("/Users/pearce/CRN/")
+  if (CPU=="huanan") setwd("~/Dropbox/PhD/CRN/git_CRN/")
+  else if (grepl("Book", CPU)) setwd("/Volumes/DataStorage/Dropbox/PhD/CRN/git_CRN/")
+  else setwd("/Users/pearce/CRN/git_CRN/")
   cat(getwd(),"\n\n")
   # system("cp ../CRNMay2018.R ./", wait=T)
 }
 
 
-source('CRNMay2018.R')
-source('TestFuns.R')
+source('CRN_BO/CRNMay2018.R')
+source('TestFuns/TestFuns.R')
 
 
 #############################################################################################
@@ -42,13 +42,13 @@ method_names = c("UNI MLE",
 if(length(Args)>0){
   
   reps = 400
-  Methods = rep(c(2, 5, 7), each=reps)
+  Methods = rep(c(2, 4, 5, 6, 7), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   Ns0 = 5
-  
+
   set.seed(1)
   JOBS = sample(length(Methods))
-  
+
   myID = JOBS[as.numeric(Args[1])] 
   
   method = Methods[myID]
@@ -126,9 +126,7 @@ Checkpoint = function(tryload=F){
 # Define Test Functions and their respetive input ranges
 
 set.seed(BOseed)
-dims      = 8
 
-# TestFun   = Build_Ambulance_Testfun(BOseed, numtestseeds=10000, runlength=1)[[1]]
 TestFun   = Build_Xie_ATO_cpp_Testfun(BOseed, 2000, 1)[[1]]
 XRAN      = attr(TestFun, 'ran')
 dims      = ncol(XRAN)

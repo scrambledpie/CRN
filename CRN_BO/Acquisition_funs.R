@@ -421,7 +421,7 @@ Make_CRNKG_grad = function(CRNGP, Xr){
   D = 1:CRNGP$dims
   tXr = t(Xr[D,])
   
-  V2 = 0 #CRNGP$HP[length(CRNGP$HP)]
+  
   
   CRNKG = function(xs){
     
@@ -435,7 +435,7 @@ Make_CRNKG_grad = function(CRNGP, Xr){
     # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
     
     
-    SDx = sqrt(abs(CRNGP$COV(xs, xs)) + V2 )[1]
+    SDx = sqrt(abs(CRNGP$COV(xs, xs)))[1]
     
     # browser()
     
@@ -465,7 +465,7 @@ Make_CRNKG_grad = function(CRNGP, Xr){
     # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
     # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
     
-    SDx = sqrt(abs(CRNGP$COV(xs, xs)) + V2)[1]
+    SDx = sqrt(abs(CRNGP$COV(xs, xs)))[1]
     
     # browser()
     
@@ -627,7 +627,6 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
   
   topKG = -Inf
   topX  = 0
-  V2 = CRNGP$HP[length(CRNGP$HP)]
   
   KG = function(x){
     xs = matrix(c(x, new_seed), 1)
@@ -670,7 +669,7 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     if (all(x1==x2)) return(0)
     
     
-    SDx = sqrt(abs(abs(CRNGP$COV(x1, x1)) + abs(CRNGP$COV(x2, x2)) - 2*CRNGP$COV(x1, x2)) + 2*V2)[1]
+    SDx = sqrt(abs(abs(CRNGP$COV(x1, x1)) + abs(CRNGP$COV(x2, x2)) - 2*CRNGP$COV(x1, x2)))[1]
     
     P1 = CRNGP$kernel(Xr, x1)
     P2 = CRNGP$kernel(Xr, x2)
@@ -718,7 +717,7 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     # repeats = apply(Xr, 1, function(xi)all(xi[D]==x1[D])) | apply(Xr, 1, function(xi)all(xi[D]==x2[D]))
     # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats]}
     # browser()
-    VARx = abs(abs(CRNGP$COV(x1, x1)) + abs(CRNGP$COV(x2, x2)) - 2*CRNGP$COV(x1, x2) + 2*V2)[1]
+    VARx = abs(abs(CRNGP$COV(x1, x1)) + abs(CRNGP$COV(x2, x2)) - 2*CRNGP$COV(x1, x2) )[1]
     SDx  = sqrt(VARx)
     
     P1 = CRNGP$kernel(Xr, x1)
