@@ -425,6 +425,9 @@ Make_CRNKG_grad = function(CRNGP, Xr){
   
   CRNKG = function(xs){
     
+    
+    if (any( apply(CRNGP$xd,1,function(xdi)all(abs(xdi-xs)<1e-8)) )) return(0)
+    
     # repeats = apply(xs[D]==tXr, 2, all)
     # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
     
@@ -660,13 +663,14 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     x1 = matrix( c(xs1xs2[D], new_seed) , 1)
     x2 = matrix( c(xs1xs2[CRNGP$dims + D], new_seed), 1)
     
+    
     # repeats = apply(x1[D]==tXr, 2, all) | apply(x2[D]==tXr, 2, all)
     # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
     
     # x1 = Check_X(x1, CRNGP$dims, T, "PWKG PW x1")
     # x2 = Check_X(x2, CRNGP$dims, T, "PWKG PW x2")
     
-    if (all(x1==x2)) return(0)
+    if (all(x1-x2<1e-8)) return(0)
     
     
     SDx = sqrt(abs(abs(CRNGP$COV(x1, x1)) + abs(CRNGP$COV(x2, x2)) - 2*CRNGP$COV(x1, x2)))[1]
