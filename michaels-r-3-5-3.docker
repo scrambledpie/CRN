@@ -21,6 +21,7 @@ ADD RUN_ATO.sh /
 
 ADD RUN_AMBULANCES.sh /
 
-COPY ./CRN_BO /
-COPY ./legacyfile /
-COPY ./*.R /
+COPY CRN_BO /CRN_BO
+COPY legacyfile /legacyfile
+COPY *.R /
+
