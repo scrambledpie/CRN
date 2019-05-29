@@ -36,7 +36,7 @@ plotpoly = function(X,Y,ER,coli,bottom=-Inf){
   polygon(xx,yy,col=adjustcolor(coli,alpha=0.5),border = NA)
 }
 
-safe_SE = function(rr){rr = rr[!is.na(rr)]; if(length(rr)==1) return(0) else return(2*sd(rr)/sqrt(length(rr)))}
+safe_SE = function(rr){rr = rr[!is.na(rr)]; if(length(rr)<2) return(0) else return(2*sd(rr)/sqrt(length(rr)))}
 
 safe_ME = function(rr){rr = rr[!is.na(rr)]; mean(rr)}
 
@@ -53,8 +53,6 @@ Get_OC_mean_var = function(R, with_max=F){
   R_ser  = apply(OC,1, safe_SE)
   cbind(Nvals, R_mean, R_ser)
 }
-
-# given a list of results and array of Xid, gets the mean and var of each Xid
 Get_multiple_OC = function(R, M, with_max=F){
   stopifnot(
     length(R)==length(M),
@@ -65,6 +63,57 @@ Get_multiple_OC = function(R, M, with_max=F){
   uM = sort(unique(M))
   
   lapply(uM, function(mi)Get_OC_mean_var(R[M==mi], with_max=with_max))
+  
+}
+
+# seed reuse time series
+Get_seed_reuse = function(R){
+  
+  Nran = range(sapply(R, function(r)range(r$Cost$N)))
+  N0 = Nran[1]
+  sc = ncol(R[[1]]$x)
+  
+  # convert each time series to binary
+  bin_stream=function(S){
+    top = Nran[2]
+    S = S[1:min(length(S), top)]
+    out = sapply(Nran[1]:length(S), function(i)S[i]%in%S[1:(i-1)])
+    c(out, rep(NA, top-length(S)))
+  }
+  
+  bin_streams = sapply(R, function(R)bin_stream(R$x[,sc]))
+  
+  ME = apply(bin_streams, 1, safe_ME)
+  SE = apply(bin_streams, 1, safe_SE)
+  
+  return(cbind(Nran[1]:Nran[2], ME, SE))
+}
+Get_multiple_seed_reuse = function(R, M){
+  stopifnot(
+    length(R)==length(M),
+    typeof(R)=="list",
+    typeof(M)%in%c("integer", "double")
+  )
+  
+  uM = sort(unique(M))
+  
+  lapply(uM, function(mi)Get_seed_reuse(R[M==mi]))
+}
+
+# barchart of seed frequencies
+Get_seed_bars = function(R, topseed=500){
+  
+  seeds = lapply(R, function(R)R$x[,ncol(R$x)])
+  
+  get_feqs = function(S)sapply(1:topseed, function(si)sum(si%in%S))
+  
+  Freqs = sapply(seeds, get_freqs)
+  
+  mean_F = apply(Freqs, 1, mean)
+  
+  mean_F = mean_F[mean_F>0]
+  
+  return(mean_F)
   
 }
 
@@ -85,6 +134,89 @@ Plot_mean_er = function(Res_matrix, col=2){
   plotpoly(Res_matrix[,1], Res_matrix[,2], Res_matrix[,3], col=col)
 }
 
+
+Seeds_barplot = function(R1=Results){
+  
+  M = sapply(R1, function(r)r$method)
+  
+  sc = ncol(R1[[1]]$x)
+  N0 = min(R1[[1]]$Cost$N)
+  
+  
+  if(sum(M==5)>0){
+    get_pairs = function(r){
+      SS = r$x[-(1:N0), sc]
+      num_seeds = length(unique(SS))
+      num_pairs = 2*(length(SS) - num_seeds)
+      num_singles = num_seeds - num_pairs
+      c(num_singles, num_pairs)
+    }
+    PWR = R1[M==5]
+    SS = apply(sapply(PWR, get_pairs),1,mean)
+    cat(SS)
+    barplot(SS, names.arg = c("singles", "pairs"), main="CompSph")
+    
+  }
+  
+  if(sum(M==7)>0){
+    get_pairs = function(r){
+      SS = r$x[-(1:N0), sc]
+      num_seeds = length(unique(SS))
+      num_pairs = 2*(length(SS) - num_seeds)
+      num_singles = num_seeds - num_pairs
+      c(num_singles, num_pairs)
+    }
+    PWR = R1[M==7]
+    SS = apply(sapply(PWR, get_pairs),1,mean)
+    cat(SS)
+    barplot(SS, names.arg = c("singles", "pairs"), main="CS+Wiggles")
+    
+  }
+  
+  
+  
+  if(sum(M==4)>0){
+    get_seed_freqs = function(r){
+      SS = r$x[-(1:N0), sc]
+      sapply(1:500, function(s)sum(SS==s))
+    }
+    get_seed_freqs_start = function(r){
+      SS = r$x[1:N0, sc]
+      sapply(1:100, function(s)sum(SS==s))
+    }
+    CRNR = R1[M==4]
+    SS = apply(sapply(CRNR, get_seed_freqs), 1, mean)
+    top = max(which(SS>0))+1
+    SS = SS[1:top]
+    
+    SSI = apply(sapply(CRNR, get_seed_freqs_start), 1, mean)
+    SSI = SSI[1:top]
+    
+    barplot(rbind(SSI,SS-SSI) , names.arg=paste(1:length(SS)), main = "CompSph")
+    
+  }
+  
+  if(sum(M==6)>0){
+    get_seed_freqs = function(r){
+      SS = r$x[-(1:N0), sc]
+      sapply(1:500, function(s)sum(SS==s))
+    }
+    get_seed_freqs_start = function(r){
+      SS = r$x[1:N0, sc]
+      sapply(1:500, function(s)sum(SS==s))
+    }
+    CRNR = R1[M==6]
+    SS = apply(sapply(CRNR, get_seed_freqs), 1, mean)
+    top = max(which(SS>0))+1
+    SS = SS[1:top]
+    
+    SSI = apply(sapply(CRNR, get_seed_freqs_start), 1, mean)
+    SSI = SSI[1:top]
+    
+    barplot(rbind(SSI,SS-SSI) , names.arg=paste(1:length(SS)), main="CS+wiggles")
+    
+  }
+}
 
 
 # given a set of OC results matrices, plots the whole lot on a single axes.

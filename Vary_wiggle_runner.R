@@ -91,6 +91,6 @@ ALGORITHMS = c(1,
                BO_PWKG_DISC)
 
 AA = ALGORITHMS[[method]]$new(TestFun, ran, X_domain, Y_f, BOseed, myID)
-AA$optimize(Budget0=5, Budget=50, hypers=TruePars)
+AA$optimize(Budget0=5, Budget=100, hypers=TruePars)
 
 
