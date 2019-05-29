@@ -40,11 +40,11 @@ if(length(Args)>0){
   else setwd("/Users/pearce/CRN/")
 
   cat("Running locally \n")
-  method = 4
+  method = 5
   BOseed = 1
   myID   = NULL #"somemoretastyshit"
   Ns0    = 3
-  rho    = 1
+  rho    = 0.1
   NOISE  = 50^2
 }
 
@@ -52,7 +52,7 @@ if(length(Args)>0){
 ################################################################################
 # Make test data
 set.seed(BOseed)
-TruePars = c(5, 100^2, 5, rho*NOISE, 0, 0.0001) #(1-rho)*NOISE)
+TruePars = c(5, 100^2, 5, rho*NOISE, 0, 0.0001 + (1-rho)*NOISE)
 Nseeds   = 115
 X_domain = 1:100
 
@@ -91,4 +91,6 @@ ALGORITHMS = c(1,
                BO_PWKG_DISC)
 
 AA = ALGORITHMS[[method]]$new(TestFun, ran, X_domain, Y_f, BOseed, myID)
-AA$optimize(Budget0=5, Budget=100, hypers=TruePars)
+AA$optimize(Budget0=5, Budget=50, hypers=TruePars)
+
+

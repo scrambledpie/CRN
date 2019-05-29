@@ -35,7 +35,7 @@ if(!debug){
   if (grepl("pearce", CPU)) setwd("/Users/pearce/CRN/")
   
   # Optimization Run
-  method   = 4
+  method   = 2
   BOseed   = 1
   Ns0      = 5
   Budget   = 25
@@ -63,7 +63,7 @@ ALGORITHMS = c(1,
 
 # exectute the optimizer
 AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
-AA$optimize(Budget0 = 20, Budget = Budget,
+AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=NULL,
             N0  = 1000, Na  = 10, maxevals  = 100,
             PN0 = 4000, PNa = 20, Pmaxevals = 200)
 cat("Finished and Saved ", filename)

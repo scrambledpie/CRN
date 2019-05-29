@@ -211,11 +211,11 @@ BO_KG = R6Class("BO_KG",
   inherit = BO_base,
   public = list(
     method = 2,
-    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100, ...){
+    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100, num_ref_x=NULL, ...){
      
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
-        Xr = Build_ref_X(self$GP, T)
+        Xr = Build_ref_X(self$GP, T, num_ref_x)
         check_seeds = max(self$GP$xd[,self$GP$dims+1]) + 1
         newx = MCMC_CRNKG_grad(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
                                N0=N0, Na=Na, maxevals=maxevals)
@@ -234,11 +234,11 @@ BO_CRNKG_CS = R6Class("BO_CRNKG_CS",
   inherit = BO_base,
   public = list(
     method = 8,
-    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
+    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,num_ref_x=NULL,...){
       
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
-        Xr = Build_ref_X(self$GP, T)
+        Xr = Build_ref_X(self$GP, T, num_ref_x)
         new_seed = max(self$GP$xd[,self$GP$dims+1]) + 1
         check_seeds = sample(new_seed)[1:min(5, new_seed)]
         newx = MCMC_CRNKG_grad(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
@@ -258,11 +258,11 @@ BO_CRNKG_CSW = R6Class("BO_CRNKG_CSW",
   inherit = BO_base,
   public = list(
     method = 9,
-    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
+    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,num_ref_x=NULL,...){
       
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
-        Xr = Build_ref_X(self$GP, T)
+        Xr = Build_ref_X(self$GP, T, num_ref_x)
         new_seed = max(self$GP$xd[,self$GP$dims+1]) + 1
         check_seeds = sample(new_seed)[1:min(5, new_seed)]
         newx = MCMC_CRNKG_grad(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
@@ -279,25 +279,25 @@ BO_CRNKG_CSW = R6Class("BO_CRNKG_CSW",
 ######################################################################
 
 BO_CRNKG_CS_allseeds = R6Class("BO_CRNKG_CS_allseeds",
-                      inherit = BO_base,
-                      public = list(
-                        method = 4,
-                        optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
-                          
-                          # define a function that suggests the next x to evaluate
-                          get_next_x = function(){
-                            Xr = Build_ref_X(self$GP, T)
-                            new_seed = max(self$GP$xd[,self$GP$dims+1]) + 1
-                            check_seeds = 1:new_seed
-                            newx = MCMC_CRNKG_grad(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
-                                                   N0=N0, Na=Na, maxevals=maxevals)
-                            return(newx)
-                          }
-                          
-                          # call the optimizer with the suggestion fuction and the kernel
-                          self$base_optimize(Budget0, Budget, get_next_x, 1)
-                        }
-                      )
+  inherit = BO_base,
+  public = list(
+    method = 4,
+    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,num_ref_x=NULL,...){
+      
+      # define a function that suggests the next x to evaluate
+      get_next_x = function(){
+        Xr = Build_ref_X(self$GP, T, num_ref_x)
+        new_seed = max(self$GP$xd[,self$GP$dims+1]) + 1
+        check_seeds = 1:new_seed
+        newx = MCMC_CRNKG_grad(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
+                               N0=N0, Na=Na, maxevals=maxevals)
+        return(newx)
+      }
+      
+      # call the optimizer with the suggestion fuction and the kernel
+      self$base_optimize(Budget0, Budget, get_next_x, 1)
+    }
+  )
 )
 
 ######################################################################
@@ -306,11 +306,11 @@ BO_CRNKG_CSW_allseeds = R6Class("BO_CRNKG_CSW_allseeds",
   inherit = BO_base,
   public = list(
    method = 6,
-   optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,...){
+   optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,num_ref_x=NULL,...){
      
      # define a function that suggests the next x to evaluate
      get_next_x = function(){
-       Xr = Build_ref_X(self$GP, T)
+       Xr = Build_ref_X(self$GP, T, num_ref_x)
        new_seed = max(self$GP$xd[,self$GP$dims+1]) + 1
        check_seeds = 1:new_seed
        newx = MCMC_CRNKG_grad(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
@@ -329,13 +329,13 @@ BO_PWKG_CS = R6Class("BO_PWKG_CS",
   inherit = BO_base,
   public = list(
     method = 5,
-    optimize = function(Budget0=20, Budget=500, 
+    optimize = function(Budget0=20, Budget=500,num_ref_x=NULL, 
                         N0=1000, Na=10, maxevals=100,
                         PN0=4000, PNa=40, Pmaxevals=200){
      
       # define a function that suggests the next x to evaluate
       get_next_x = function(){
-        Xr = Build_ref_X(self$GP, T)
+        Xr = Build_ref_X(self$GP, T, num_ref_x)
         newx = MCMC_PWKG_grad(list(self$GP), Xr=Xr,
                                N0=N0, Na=Na, maxevals=maxevals, 
                                PN0=PN0, PNa=PNa, Pmaxevals=Pmaxevals)
@@ -354,13 +354,13 @@ BO_PWKG_CSW = R6Class("BO_PWKG_CSW",
   inherit = BO_base,
   public = list(
     method = 7,
-    optimize = function(Budget0=20, Budget=500, 
+    optimize = function(Budget0=20, Budget=500, num_ref_x=NULL,
                         N0=1000, Na=10, maxevals=100,
                         PN0=4000, PNa=40, Pmaxevals=200){
      
         # define a function that suggests the next x to evaluate
         get_next_x = function(){
-          Xr = Build_ref_X(self$GP, T)
+          Xr = Build_ref_X(self$GP, T, num_ref_x)
           newx = MCMC_PWKG_grad(list(self$GP), Xr=Xr,
                                N0=N0, Na=Na, maxevals=maxevals, 
                                PN0=PN0, PNa=PNa, Pmaxevals=Pmaxevals)

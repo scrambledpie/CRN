@@ -52,19 +52,20 @@ KGCBcpp   = function(a, b){
   sum(  a[I]*(pC[-1]-pC[-length(pC)]) - b[I]*(dC[-1]-dC[-length(pC)])  ) - max(a)
 }
 
-Build_ref_X = function(GP, rounding=F){
+Build_ref_X = function(GP, rounding=F, num_x_ref=NULL){
   
   xd   = GP$xd
   XRAN = GP$XRAN
   
-  
-  
   xd = xd[,1:ncol(XRAN)]
   xd = Check_X(xd, ncol(XRAN), F, "Xr builder1")
   
-  Xr = rbind(LHCran(nrow(xd), XRAN),
-             xd + rnorm(length(xd)))
-  
+  if(is.null(num_x_ref)){
+    Xr = rbind(LHCran(nrow(xd), XRAN),
+               xd + rnorm(length(xd)))
+  }else{
+    Xr = LHCran(num_x_ref, XRAN)
+  }
   
   Xr = sapply(1:GP$dims, function(d){Xr[,d] = pmax(Xr[,d], XRAN[1,d]); pmin(Xr[,d], XRAN[2,d])})
   
