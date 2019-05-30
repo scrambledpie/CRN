@@ -12,7 +12,7 @@ if(!debug){
   cat(getwd(),"\n\n")
   
   reps = 400
-  Methods = rep(c(2, 4, 5, 6, 7), each=reps)
+  Methods = rep(c(2, 9), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   
   set.seed(1)
@@ -35,10 +35,10 @@ if(!debug){
   if (grepl("pearce", CPU)) setwd("/Users/pearce/CRN/")
   
   # Optimization Run
-  method   = 2
+  method   = 9
   BOseed   = 1
   Ns0      = 5
-  Budget   = 25
+  Budget   = 500
   filename = NULL
 }
 
@@ -63,8 +63,9 @@ ALGORITHMS = c(1,
 
 # exectute the optimizer
 AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
-AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=NULL,
-            N0  = 1000, Na  = 10, maxevals  = 100,
+
+AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=2000, Ns=1,
+            N0  = 4000, Na  = 10, maxevals  = 50,
             PN0 = 4000, PNa = 20, Pmaxevals = 200)
 cat("Finished and Saved ", filename)
 

@@ -493,7 +493,7 @@ Make_CRNKG_grad_cpp = function(CRNGP, Xr){
   
   return(list(KG=CRNKG, dKG=dCRNKG))
 }
-}
+
 
 Make_CRNKG_grad = function(CRNGP, Xr){
   
@@ -517,6 +517,8 @@ Make_CRNKG_grad = function(CRNGP, Xr){
   D = 1:CRNGP$dims
   tXr = t(Xr[D,])
   
+  dd = CRNGP$dims+1
+  maxVAR = 0.0001*CRNGP$HP[dd]
   
   
   CRNKG = function(xs){
@@ -539,12 +541,13 @@ Make_CRNKG_grad = function(CRNGP, Xr){
     # browser()
     
     P0 = CRNGP$kernel(Xr, xs)
-    # Nr = P0 > 0.001
+    Nr = P0 > quantile(P0, probs=0.9)
     # 
     SIGT = rep(0, length(P0))
     # 
-    # SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
-    SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
+    SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
+    # print(sum(Nr)/length(Nr))
+    # SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
     
     xs0  = matrix(c(xs[D], ref_seed), 1)
     
@@ -571,7 +574,7 @@ Make_CRNKG_grad = function(CRNGP, Xr){
     # browser()
     
     P0 = CRNGP$kernel(Xr, xs)
-    Nr = P0 > -Inf
+    Nr = P0 >quantile(P0, probs=0.9)
     # 
     SIGT = rep(0, length(P0))
     # 

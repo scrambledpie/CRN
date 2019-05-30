@@ -1435,7 +1435,7 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     sqrt(iC_xx) * (dC_x - 0.5*iC_xx*outer(C_x, dC_xx))
   },
   
-  RecX = function(Ns=NULL, maxevals=50,oldrecx=NULL,...){
+  RecX = function(Ns=NULL, maxevals=50, oldrecx=NULL,...){
     if(is.null(Ns)){
       Ns = prod(sapply(1:self$dims, function(d)1.5*(self$XRAN[2,d]-self$XRAN[1,d])/self$HP[d]))
       Ns = min(Ns, 4000)
