@@ -12,7 +12,7 @@ if(!debug){
   cat(getwd(),"\n\n")
   
   reps = 400
-  Methods = rep(c(2, 9), each=reps)
+  Methods = rep(c(2, 5, 9), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   
   set.seed(1)
@@ -35,7 +35,7 @@ if(!debug){
   if (grepl("pearce", CPU)) setwd("/Users/pearce/CRN/")
   
   # Optimization Run
-  method   = 9
+  method   = 5
   BOseed   = 1
   Ns0      = 5
   Budget   = 500
