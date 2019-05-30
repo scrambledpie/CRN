@@ -40,6 +40,8 @@ safe_SE = function(rr){rr = rr[!is.na(rr)]; if(length(rr)<2) return(0) else retu
 
 safe_ME = function(rr){rr = rr[!is.na(rr)]; mean(rr)}
 
+safe_range = function(rr){rr = rr[!is.na(rr)]; range(rr)}
+
 # get the mean and var OC of a set of results, returns [X, Y, se(Y)] matrix
 Get_OC_mean_var = function(R, with_max=F){
   Nran = sapply(R, function(r)range(r$Cost$N))
@@ -133,7 +135,53 @@ Plot_mean_er = function(Res_matrix, col=2){
   lines(Res_matrix[,1], Res_matrix[,2], col=col)
   plotpoly(Res_matrix[,1], Res_matrix[,2], Res_matrix[,3], col=col)
 }
+Plot_pnts_bars = function(Res_matrix, col=2){
+  x = Res_matrix[,1]
+  avg = Res_matrix[,2]
+  sdev = Res_matrix[,3]
+  points(x, avg, col=col, pch=19)
+  lines(x, avg, col=col)
+  arrows(x, avg-sdev, x, avg+sdev, length=0.05, angle=90, code=3, col=col)
+}
 
+plot_errors = function(R, M, P, N=NULL, cols = 2:100){
+  
+  # R list of matrices
+  # M vector of experiment ID
+  # P vector of parameter values to plot over
+  # N the row in the matrix to pick from
+  # cols
+  
+  stopifnot(
+    typeof(R)=="list",
+    typeof(M)%in%c("double", "integer"),
+    typeof(P)%in%c("double", "integer"),
+    length(R)==length(P),
+    length(P)==length(M),
+    N <= max(sapply(R, nrow)),
+    length(unique(M))<=length(cols)
+  )
+  
+  uM = sort(unique(M))
+  uP = sort(unique(P))
+  
+  get_output=function(ri, N) tryCatch(ri[N,2:3], error=function(e)c(NA,NA))
+  
+  ResList = lapply(uM, function(mi)t(sapply(uP, function(pi) get_output(R[M==mi&P==pi][[1]], N))))
+  
+  yran = range(sapply(ResList, function(r)safe_range(c(r[,1]+r[,2], r[,1]-r[,2]))))
+  
+  print(yran)
+  
+  Empty_plot(range(P), yran)
+  
+  
+  for(i in 1:length(uM)){
+    Plot_pnts_bars( cbind(uP, ResList[[i]]) , col=cols[i])
+  }
+  
+  
+}
 
 Seeds_barplot = function(R1=Results){
   
@@ -232,3 +280,8 @@ Res_plot = function(R, cols=2:100, xr=NULL, yr=NULL, xlab="", ylab="", main="", 
   for(Ri in R){Plot_mean_er(Ri, cols[k]); k=k+1}
   
 }
+
+
+
+
+

@@ -399,7 +399,101 @@ New_CRNUniformDesign = function(N0, XRAN, TestFun, split=0.5, rounding=F){
 #############################################################################################
 #############################################################################################
 ## ACQUISITION FUNCTIONS
-
+Make_CRNKG_grad_cpp = function(CRNGP, Xr){
+  # browser()
+  iKr = CRNGP$kernel(Xr, CRNGP$xd)%*%CRNGP$iK
+  Mr  = CRNGP$MU(Xr)
+  
+  D = 1:CRNGP$dims
+  tXr = t(Xr[D,])
+  
+  
+  
+  CRNKG = function(xs){
+    
+    
+    if (any( apply(CRNGP$xd,1,function(xdi)all(abs(xdi-xs)<1e-8)) )) return(0)
+    
+    # repeats = apply(xs[D]==tXr, 2, all)
+    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
+    
+    xs = matrix(xs,1)
+    # xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
+    
+    # if x is in the set Xr
+    # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
+    
+    
+    SDx = sqrt(abs(CRNGP$COV(xs, xs)))[1]
+    
+    # browser()
+    
+    P0 = CRNGP$kernel(Xr, xs)
+    # Nr = P0 > 0.001
+    # 
+    SIGT = rep(0, length(P0))
+    # 
+    # SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
+    SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
+    
+    xs0  = matrix(c(xs[D], ref_seed), 1)
+    
+    SIGT = c(SIGT, CRNGP$COV(xs0, xs)/SDx)
+    
+    MM   = c(Mr, CRNGP$MU(xs0))
+    
+    if(any(is.nan(SIGT))) return(0)
+    
+    O = KGCBfilter(MM, SIGT)
+    
+    O
+  }
+  
+  dCRNKG = function(xs){
+    # xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
+    xs = matrix(xs, 1)
+    # if x is in the set Xr
+    # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
+    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
+    
+    SDx = sqrt(abs(CRNGP$COV(xs, xs)))[1]
+    
+    # browser()
+    
+    P0 = CRNGP$kernel(Xr, xs)
+    Nr = P0 > -Inf
+    # 
+    SIGT = rep(0, length(P0))
+    # 
+    SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
+    # SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
+    
+    xs0  = matrix(c(xs[D], ref_seed), 1)
+    
+    SIGT = c(SIGT, CRNGP$COV(xs0, xs)/SDx)
+    
+    MM   = c(Mr, CRNGP$MU(xs0))
+    
+    O = KGCBfilter_grad(MM, SIGT)
+    
+    Nr = abs(O$dsig)>0
+    Nrr = which(Nr[-length(Nr)])
+    
+    Nr = which(Nr)
+    
+    # browser()
+    
+    dKG_s = (O$dsig[Nr]%*%CRNGP$dSIGT.dx_xr(xs, Xr[Nrr,,drop=F], t(iKr[Nrr,,drop=F]))  )[1:CRNGP$dims]
+    
+    dKG_m = unlist( CRNGP$DTheta(xs[1:CRNGP$dims])) * O$dmu[length(O$dmu)]
+    # dKG_s = (O$dsig%*%CRNGP$dSIGT.dx_xr(xs, Xr, t(iKr)))[1:CRNGP$dims]
+    
+    list(dKG=dKG_m + dKG_s, KG=O$KG)
+  }
+  
+  return(list(KG=CRNKG, dKG=dCRNKG))
+}
+}
 
 Make_CRNKG_grad = function(CRNGP, Xr){
   
