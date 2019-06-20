@@ -13,7 +13,7 @@ if(!debug){
   cat(getwd(),"\n\n")
   
   reps = 400
-  Methods = rep(c(2, 5, 9), each=reps)
+  Methods = rep(c(2, 4, 5, 6, 7), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   
   set.seed(1)
