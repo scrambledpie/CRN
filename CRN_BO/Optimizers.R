@@ -55,7 +55,8 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
       self$Timing[[N]] = c(KG_time, eval_time, fit_time)
       
       if(length(self$RecX)>0){
-        self$RecX[[N]]   = self$GP$RecX(oldrecx=self$RecX[[N-1]])
+        oldxr = tail(self$RecX, 1)[[1]]
+        self$RecX[[N]]   = self$GP$RecX(oldrecx=oldxr)
       }else{
         self$RecX[[N]]   = self$GP$RecX()
       }
@@ -246,7 +247,7 @@ BO_CRNKG_CS = R6Class("BO_CRNKG_CS",
         Xr = Build_ref_X(self$GP, T, num_ref_x)
         new_seed = max(self$GP$xd[,self$GP$dims+1]) + 1
         check_seeds = sample(new_seed)[1:min(Ns, new_seed)]
-        newx = MCMC_CRNKG_grad(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
+        newx = MCMC_CRNKG_grad_cheap(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
                                N0=N0, Na=Na, maxevals=maxevals)
         return(newx)
       }
@@ -270,7 +271,7 @@ BO_CRNKG_CSW = R6Class("BO_CRNKG_CSW",
         Xr = Build_ref_X(self$GP, T, num_ref_x)
         new_seed = max(self$GP$xd[,self$GP$dims+1]) + 1
         check_seeds = sample(new_seed)[1:min(Ns, new_seed)]
-        newx = MCMC_CRNKG_grad(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
+        newx = MCMC_CRNKG_grad_cheap(list(self$GP), Xr=Xr, check_Seeds=check_seeds,
                                N0=N0, Na=Na, maxevals=maxevals)
         return(newx)
       }

@@ -68,10 +68,36 @@ LHCran = function(N0, ran){
   BB + LHC1*CC
 }
 
-Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, reltol=1e-8, maxevals=Inf){
+LHCran_seeds = function(N0, ran, ncats){
+  # Args
+  #   N0: the number of points to generate
+  #   ran: the box for scaling+centring samples
+  #   
+  # Returns
+  #   a randomly generated LHC of N0 points in box ran dimensions
+  
+  if(length(ran)==2)ran=matrix(ran,ncol=1)
+  
+  if (any(ran[1,]>=ran[2,])|nrow(ran)!=2) stop("LHC bounds are not valid: ", paste(bottoms, tops, collapse=", "))
+  
+  dims = ncol(ran)
+  LHC1 = sapply(1:dims,function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
+  
+  BB = matrix(ran[1,], N0, length(ran[1,]), byrow=T)
+  CC = matrix(ran[2,]-ran[1,], N0, length(ran[1,]), byrow=T)
+  
+  LHC = BB + LHC1*CC
+  
+  m = ceiling(N0/ncats)
+  LHC_seed = sample(rep(1:ncats, m), size=N0)
+  
+  return(cbind(LHC, LHC_seed))
+}
+
+Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, reltol=1e-8, maxevals=100){
   
   
-  cat("\n Na:", Na, ", N0: ", N0, ", maxevals: ",maxevals, ",  ")
+  cat("\n  N0: ", N0, ", Na:", Na, ", maxevals: ",maxevals, ", #x0:", floor(length(x0)/ncol(ran)) )
   # browser()
   # Function that maximizes f1 and returns argmax
   # 
@@ -80,13 +106,13 @@ Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, relto
   #   df1: gradient of f1
   #   ran: upper+lower bounds of all arguments
   #   N0: number of random intial function evaluations
-  #   Na: nuber of the random initial points to use for grad ascent
+  #   Na: number of the random initial points to use for grad ascent
   #   x0: an optional starting point for the optimizer
   # 
   # Returns
   #   bestx: argmax of f1
   
-  con = list(reltol = reltol, maxit=75)
+  con = list(reltol = reltol, maxit=75, fnscale=-1)
   
   bs = ran[1,]
   ts = ran[2,]
@@ -128,33 +154,22 @@ Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, relto
       !is.null(OO)
     )
     
+    
+    if(Na==0 & is.null(x0)){
+      warning("Optimizer_2 Na=0, x0=NULL, random search only")
+    }
+    
+    if(!is.null(x0) & maxevals)
+    
+    
     if(all(x>bs)&all(x<ts)) History <<- rbind(History,c(x,OO))
     
     evals <<- evals+1
-    return(-OO)
+    return(OO)
   }
   
   dff1 = function(x){
-    -df1(x)
-  }
-  
-  safe_optim = function(x_start){
-    
-    evals = 0
-    dead = tryCatch({ 
-      optim(par = x_start, fn = ff1, dff1, method = "L-BFGS-B", control = con) 
-    }, 
-    error = function(e)-1e9,
-    warning = function(w)-1e9
-    )
-    
-    evals = 0
-    dead = tryCatch({ 
-      optim(par = x_start, fn = ff1, dff1, method = "CG", control = con) 
-    }, 
-    error = function(e)-1e9,
-    warning = function(w)-1e9
-    )
+    df1(x)
   }
   
   safe_ff1 = function(x){
@@ -165,6 +180,27 @@ Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, relto
     warning = function(w)NaN
     )
   }
+  
+  safe_optim = function(x_start){
+    
+    evals = 0
+    dead = tryCatch({ 
+        optim(par = x_start, fn = ff1, dff1, method = "L-BFGS-B", control = con) 
+      }, 
+      error = function(e)-1e9,
+      warning = function(w)-1e9
+    )
+    
+    evals = 0
+    dead = tryCatch({ 
+        optim(par = x_start, fn = ff1, dff1, method = "CG", control = con) 
+      }, 
+      error = function(e)-1e9,
+      warning = function(w)-1e9
+    )
+  }
+  
+
   
   #################################################################################
   # If we have a given starting point, then optimise from that start!
@@ -184,23 +220,20 @@ Optimizer_2  = function(f1, df1, ran, N0=1000, Na=5, x0=NULL, debugging=F, relto
     
     Keepers = !is.nan(Output)
     Output  = Output[Keepers]
+    
+    # print(Output)
+    
     X0      = X0[Keepers,,drop=F]
     
     rank    = order(Output, decreasing=T)
     Na      = min(Na, length(Output))
     
-    X0      = History[rank[1:Na], , drop=F]
-    
-    dead    = apply(X0, 1, safe_optim)
-    
+    if(Na>0){
+      X0      = X0[rank[1:Na], , drop=F]
+      
+      dead    = apply(X0, 1, safe_optim)
+    }
   }
-  
-  #################################################################################
-  # Get the best and run optimizers one more time
-  lHist = History[, length(ts)+1]
-  bestx = History[which.max(lHist), 1:length(ts)]
-  dead  = safe_optim(bestx)
-  
   
   #################################################################################
   # Get the final best and return it

@@ -7,6 +7,7 @@ debug = length(Args)==0
 if(!length(Args)%in%c(0,2))stop("Give a jobID and Budget>20 as arguments")
 
 if(!debug){
+  
   # Running from terminal
   cat(CPU,"\n\n", commandArgs(), "\n\n")
   cat(getwd(),"\n\n")
@@ -27,6 +28,7 @@ if(!debug){
   filename = paste(c(myID, "AMB", method, BOseed), collapse = "_")
   
 }else{
+  
   # running within Rstudio
   cat("Running locally \n")
   
@@ -35,7 +37,7 @@ if(!debug){
   if (grepl("pearce", CPU)) setwd("/Users/pearce/CRN/")
   
   # Optimization Run
-  method   = 5
+  method   = 7
   BOseed   = 1
   Ns0      = 5
   Budget   = 500
@@ -53,20 +55,20 @@ source('CRN_BO/Optimizers.R')
 ALGORITHMS = c(1, 
                BO_KG, 
                1, 
-               BO_CRNKG_CS_allseeds, 
+               BO_CRNKG_CS, 
                BO_PWKG_CS, 
-               BO_CRNKG_CSW_allseeds,
+               BO_CRNKG_CSW,
                BO_PWKG_CSW,
-               BO_CRNKG_CS,
-               BO_CRNKG_CSW)
+               BO_CRNKG_CS_allseeds,
+               BO_CRNKG_CSW_allseeds)
 
 
 # exectute the optimizer
 AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
 
-AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=2000, Ns=1,
-            N0  = 4000, Na  = 10, maxevals  = 50,
-            PN0 = 4000, PNa = 20, Pmaxevals = 200)
+AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=NULL, Ns=1,
+            N0  = 1000, Na  = 5, maxevals  = 50,
+            PN0 = 4000, PNa = 10, Pmaxevals = 100)
 cat("Finished and Saved ", filename)
 
 

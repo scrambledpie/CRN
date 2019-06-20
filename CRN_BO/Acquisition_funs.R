@@ -60,6 +60,10 @@ Build_ref_X = function(GP, rounding=F, num_x_ref=NULL){
   xd = xd[,1:ncol(XRAN)]
   xd = Check_X(xd, ncol(XRAN), F, "Xr builder1")
   
+  sdx = XRAN[2,] - XRAN[1,]
+  
+  rep()
+  
   if(is.null(num_x_ref)){
     Xr = rbind(LHCran(nrow(xd), XRAN),
                xd + rnorm(length(xd)))
@@ -494,7 +498,6 @@ Make_CRNKG_grad_cpp = function(CRNGP, Xr){
   return(list(KG=CRNKG, dKG=dCRNKG))
 }
 
-
 Make_CRNKG_grad = function(CRNGP, Xr){
   
   # params:
@@ -521,33 +524,30 @@ Make_CRNKG_grad = function(CRNGP, Xr){
   maxVAR = 0.0001*CRNGP$HP[dd]
   
   
-  CRNKG = function(xs){
+  Forward = function(xs){
     
+    xs = matrix(xs, 1)
+    xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
     
     if (any( apply(CRNGP$xd,1,function(xdi)all(abs(xdi-xs)<1e-8)) )) return(0)
-    
-    # repeats = apply(xs[D]==tXr, 2, all)
-    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
-    
+
     xs = matrix(xs,1)
-    # xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
-    
-    # if x is in the set Xr
-    # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
-    
-    
+    xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
+
     SDx = sqrt(abs(CRNGP$COV(xs, xs)))[1]
     
     # browser()
     
     P0 = CRNGP$kernel(Xr, xs)
-    Nr = P0 > quantile(P0, probs=0.9)
-    # 
-    SIGT = rep(0, length(P0))
-    # 
-    SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
-    # print(sum(Nr)/length(Nr))
-    # SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
+    Nr = P0 > -1
+
+    
+    if(sum(Nr==length(Nr))){
+      SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) )*(1/SDx)
+    }else{
+      SIGT = rep(0, length(P0))
+      SIGT[Nr] = ( P0[Nr] - iKr[Nr,,drop=F]%*%CRNGP$kernel(CRNGP$xd, xs) ) *(1/SDx)
+    }
     
     xs0  = matrix(c(xs[D], ref_seed), 1)
     
@@ -557,51 +557,37 @@ Make_CRNKG_grad = function(CRNGP, Xr){
     
     if(any(is.nan(SIGT))) return(0)
     
-    O = KGCBfilter(MM, SIGT)
+    O = KGCBfilter_grad(MM, SIGT)
     
     O
   }
   
+  CRNKG = function(xs) Forward(xs)$KG
+  
   dCRNKG = function(xs){
-    # xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
-    xs = matrix(xs, 1)
-    # if x is in the set Xr
-    # repeats = apply(Xr, 1, function(xi)all(xi[D]==xs[D]))
-    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
+   
+    O = Forward(xs)
     
-    SDx = sqrt(abs(CRNGP$COV(xs, xs)))[1]
-    
-    # browser()
-    
-    P0 = CRNGP$kernel(Xr, xs)
-    Nr = P0 >quantile(P0, probs=0.9)
-    # 
-    SIGT = rep(0, length(P0))
-    # 
-    SIGT[Nr] = ( P0[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, xs) ) / SDx
-    # SIGT = ( P0 - iKr%*%CRNGP$kernel(CRNGP$xd, xs) ) * (1/SDx)
-    
-    xs0  = matrix(c(xs[D], ref_seed), 1)
-    
-    SIGT = c(SIGT, CRNGP$COV(xs0, xs)/SDx)
-    
-    MM   = c(Mr, CRNGP$MU(xs0))
-    
-    O = KGCBfilter_grad(MM, SIGT)
-    
+    # compute Backward pass by hand
     Nr = abs(O$dsig)>0
-    Nrr = which(Nr[-length(Nr)])
     
-    Nr = which(Nr)
+    Nrr = which(Nr[-length(Nr)]) # excluding x1
+    Nr  = which(Nr)
     
-    # browser()
-    
-    dKG_s = (O$dsig[Nr]%*%CRNGP$dSIGT.dx_xr(xs, Xr[Nrr,,drop=F], t(iKr[Nrr,,drop=F]))  )[1:CRNGP$dims]
-    
+    if(length(Nr)==0){
+      dKG_s=rep(0, CRNGP$dims)
+    }else{
+      # browser()
+      grad_sig = CRNGP$dSIGT.dx_xr(xs, Xr[Nrr,,drop=F], t(iKr[Nrr,,drop=F]))
+      
+      # if the x1 is not in the epigraph, we remove its gradient (that is automatically included)
+      if(!length(O$dsig)%in%Nr) grad_sig = grad_sig[-nrow(grad_sig),,drop=F]
+      
+      dKG_s = as.numeric(O$dsig[Nr]%*%grad_sig)
+    }
     dKG_m = unlist( CRNGP$DTheta(xs[1:CRNGP$dims])) * O$dmu[length(O$dmu)]
-    # dKG_s = (O$dsig%*%CRNGP$dSIGT.dx_xr(xs, Xr, t(iKr)))[1:CRNGP$dims]
     
-    list(dKG=dKG_m + dKG_s, KG=O$KG)
+    list(dKG=dKG_m+dKG_s, KG=O$KG)
   }
   
   return(list(KG=CRNKG, dKG=dCRNKG))
@@ -698,6 +684,135 @@ MCMC_CRNKG_grad = function(CRNGPs, Xr, check_Seeds=NULL,
   topxs
 }
 
+MCMC_CRNKG_grad_cheap = function(CRNGPs, Xr, check_Seeds=NULL,
+                           N0=1000, Na=1, maxevals=50){
+  
+  # params:
+  #  CRNGPs: a list of GP objects from GP_model.R
+  #  Xr: a set of candidate reference points
+  #  N0: number of random search points for AF optimizer
+  #  Na: number of the random starts to continue for grad ascent
+  #  maxevals: number of grad ascent steps to take
+  #
+  # returns:
+  #  list(KG, dKG): the KG acq fun and its derivitive
+  #
+  
+  
+  dims = CRNGPs[[1]]$dims
+  
+  if(is.null(check_Seeds)) check_Seeds = max(CRNGPs[[1]]$xd[,dims+1])
+  
+  cat("optim CRNKG_grad_cheap...")
+  
+  # Check reference points and remove repeats
+  Xr = Check_ref_X(Xr, CRNGPs[[1]]$dims, T, "CRNKG Xr")
+  
+  topKG = -Inf
+  topxs = 0
+  
+  if(length(CRNGPs)==1){
+    KG_FUNS = Make_CRNKG_grad(CRNGPs[[1]], Xr)
+    KG_i = KG_FUNS$KG
+    dKG_i = KG_FUNS$dKG
+    KG = function(xs){
+      KG_v = KG_i(xs)
+      if(KG_v > topKG){
+        
+        topKG <<- KG_v
+        topxs <<- xs
+        
+        # cat("best x ", signif(topxs,3), "  value ", signif(topKG),"\n")
+      }
+      KG_v
+    }
+    
+    dKG = function(xs){
+      O = dKG_i(xs)
+      if(O$KG > topKG){
+        topKG <<- O$KG
+        topxs <<- xs
+      }
+      return(O$dKG)
+    }
+    
+  }else{
+    KG_FUNS = lapply(CRNGPs, function(CRNGP)Make_CRNKG_grad(CRNGP, Xr) )
+    
+    KG = function(xs){
+      KG_v = mean(sapply(KG_FUNS, function(KG_F)KG_F$KG(xs)))
+      if(KG_v > topKG){
+        topKG <<- KG_v
+        topxs <<- xs
+      }
+      KG_v
+    }
+    
+    dKG = function(xs){
+      KG_v = sapply(KG_FUNS, function(KG_F)KG_F$dKG(xs))
+      KG_v = apply(KG_v, 1, mean)
+      KG_v
+    }
+    
+  }
+  
+  
+  # KG_i = sapply(check_seeds, function(s)sapply(1:99,function(xi)KG(c(xi,s))))
+  # plot(c(0,100), range(KG_i), col="white")
+  # BB = sapply(check_seeds, function(s)lines(1:99, KG_i[,s], col=s+1))
+  
+  numseeds = max(CRNGPs[[1]]$xd[,CRNGPs[[1]]$dims+1])+1
+  
+  
+  # STEP 1
+  # Start with random search
+  XS0 = LHCran_seeds(N0, CRNGPs[[1]]$XRAN, numseeds)
+  KG_eval = apply(XS0, 1, KG)
+  # cat("\nfirst RS topx:", topKG)
+  
+  
+  # STEP 2
+  # Take the top Na-1 and send them to gradient ascent
+  top_Na = order(KG_eval, decreasing=T)[1:(Na-1)]
+  for(i in top_Na){
+    s = XS0[i, ncol(XS0)]
+    KGs = function(x)KG(c(x,s))
+    dKGs = function(x)dKG(c(x,s))
+    dead = Optimizer_2(KGs, 
+                       dKGs, 
+                       ran=CRNGPs[[1]]$XRAN,
+                       x0 = XS0[i,1:(ncol(XS0)-1)],
+                       N0=0,
+                       Na=0,
+                       maxevals=maxevals)
+  }
+  # cat("\nsecond grad topx:", topKG)
+  
+  
+  # STEP 3
+  # take the best x value and evaluate all seeds
+  topx = topxs[1:dims]
+  tops = which.max(sapply(1:numseeds, function(s)KG(c(topx, s))))
+  # cat("\nthird grad topx all seeds:", topKG)
+  
+  
+  # STEP 4
+  # gradient ascent once more from the top seed
+  KGs = function(x)KG(c(x,tops))
+  dKGs = function(x)dKG(c(x,tops))
+  dead = Optimizer_2(KGs, 
+                     dKGs, 
+                     ran=CRNGPs[[1]]$XRAN,
+                     x0 = topx,
+                     N0=0,
+                     Na=0,
+                     maxevals=maxevals)
+  
+  # cat("\nfourth ascent topxs:", topKG)
+  cat("\ndone, ")
+  
+  topxs
+}
 
 
 
@@ -734,7 +849,7 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
   
   KG = function(x){
     xs = matrix(c(x, new_seed), 1)
-    # xs = Check_X(xs, CRNGP$dims, T, "PWKG KG xs")
+    xs = Check_X(xs, CRNGP$dims, T, "PWKG KG xs")
     O = KGFUNS$KG(xs)
     
     if(O>topKG){
@@ -747,7 +862,7 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
   
   dKG = function(x){
     xs = matrix(c(x, new_seed), 1)
-    # xs = Check_X(xs, CRNGP$dims, T, "PWKG KG xs")
+    xs = Check_X(xs, CRNGP$dims, T, "PWKG dKG xs")
     
     O = KGFUNS$dKG(xs)
     
@@ -759,11 +874,14 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     return(O$dKG)
   }
   
-  PWKG = function(xs1xs2){
-    
+  
+  # PWKG = function(xs1xs2){
+  Forward = function(xs1xs2){
     x1 = matrix( c(xs1xs2[D], new_seed) , 1)
     x2 = matrix( c(xs1xs2[CRNGP$dims + D], new_seed), 1)
     
+    x1 = Check_X(x1, CRNGP$dims, T, "PWKG Forward x1")
+    x2 = Check_X(x2, CRNGP$dims, T, "PWKG Forward x2")
     
     # repeats = apply(x1[D]==tXr, 2, all) | apply(x2[D]==tXr, 2, all)
     # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats] }
@@ -771,18 +889,29 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     # x1 = Check_X(x1, CRNGP$dims, T, "PWKG PW x1")
     # x2 = Check_X(x2, CRNGP$dims, T, "PWKG PW x2")
     
-    if (all(x1-x2<1e-8)) return(0)
+    
+    # browser()
+    if (all(abs(x1-x2)<1e-8)){
+      dd = nrow(Xr)+2
+      return(list(KG=0, dmu=rep(0, dd), dsig=rep(0, dd), Nr = rep(F, dd)))
+    }
     
     
     SDx = sqrt(abs(abs(CRNGP$COV(x1, x1)) + abs(CRNGP$COV(x2, x2)) - 2*CRNGP$COV(x1, x2)))[1]
     
+    
     P1 = CRNGP$kernel(Xr, x1)
     P2 = CRNGP$kernel(Xr, x2)
-    Nr = P1 > 0.001 | P2 > 0.001
+    Nr = P1 > -0.001 | P2 > -0.001
     
-    SIGT = rep(0, length(P1))
-    SIGT[Nr] =            P1[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, x1) 
-    SIGT[Nr] = SIGT[Nr] - P2[Nr] + iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, x2)
+    if(sum(Nr)==length(Nr)){
+      SIGT =        P1 - iKr%*%CRNGP$kernel(CRNGP$xd, x1) 
+      SIGT = SIGT - P2 + iKr%*%CRNGP$kernel(CRNGP$xd, x2)
+    }else{
+      SIGT = rep(0, length(P1))
+      SIGT[Nr] =            P1[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, x1) 
+      SIGT[Nr] = SIGT[Nr] - P2[Nr] + iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, x2)
+    }
     
     xs01  = matrix(c(x1[D], 0), 1)
     xs02  = matrix(c(x2[D], 0), 1)
@@ -790,7 +919,8 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     SIGTx1 = CRNGP$COV(xs01, x1)[1] - CRNGP$COV(xs01, x2)[1]
     SIGTx2 = CRNGP$COV(xs02, x1)[1] - CRNGP$COV(xs02, x2)[1]
     
-    SIGT = c(SIGT, SIGTx1, SIGTx2) *(1 / SDx)
+    COV_dif = c(SIGT, SIGTx1, SIGTx2)
+    SIGT = COV_dif *(1 / SDx)
     
     MM   = c(Mr, CRNGP$MU(xs01), CRNGP$MU(xs02))
     
@@ -798,73 +928,86 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     
     if(any(is.nan(SIGT))) return(0)
     
-    O = 0.5 * KGCBfilter(MM, SIGT) * ratio
+    O = KGCBfilter_grad(MM, SIGT)
     
-    if(O>topKG){
-      topKG <<- O
-      topX <<-  rbind(x1, x2)
+    
+    if(O$KG*0.5>topKG){
+      topKG <<- 0.5*O$KG
+      topX  <<-  rbind(x1, x2)
     }
     
-    O
+    O$Nr    = Nr
+    O$COV_dif = COV_dif
+    O$SDx    = SDx
+    
+    return(O)
     
   }
+  
+  PWKG = function(xs1xs2)Forward(xs1xs2)$KG*0.5
   
   dPWKG = function(xs1xs2){
     
     x1 = matrix( c(xs1xs2[D], new_seed), 1)
     x2 = matrix( c(xs1xs2[CRNGP$dims + D], new_seed), 1)
+    xs01  = matrix(c(x1[D], 0), 1)
+    xs02  = matrix(c(x2[D], 0), 1)
     
-    # x1 = Check_X(x1, CRNGP$dims, T, "PWKG PW x1")
-    # x2 = Check_X(x2, CRNGP$dims, T, "PWKG PW x2")
+    # # x1 = Check_X(x1, CRNGP$dims, T, "PWKG PW x1")
+    # # x2 = Check_X(x2, CRNGP$dims, T, "PWKG PW x2")
+    # 
+    # if (all(x1==x2)) return(rep(0, CRNGP$dims*2))
+    # 
+    # # if(xs[1]==75)browser()
+    # # if x is in the set Xr
+    # # repeats = apply(Xr, 1, function(xi)all(xi[D]==x1[D])) | apply(Xr, 1, function(xi)all(xi[D]==x2[D]))
+    # # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats]}
+    # # browser()
+    # VARx = abs(abs(CRNGP$COV(x1, x1)) + abs(CRNGP$COV(x2, x2)) - 2*CRNGP$COV(x1, x2) )[1]
+    # SDx  = sqrt(VARx)
+    # 
+    # P1 = CRNGP$kernel(Xr, x1)
+    # P2 = CRNGP$kernel(Xr, x2)
+    # Nr = P1 > 0.001 | P2 > 0.001
+    # 
+    # COV1     = rep(0, length(P1))
+    # COV1[Nr] = P1[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, x1)
+    # 
+    # COV2     = rep(0, length(P1))
+    # COV2[Nr] = P2[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, x2)
+    # 
+    # xs01  = matrix( c(x1[D], 0), 1)
+    # xs02  = matrix( c(x2[D], 0), 1)
+    # 
+    # COV1 = c( COV1, CRNGP$COV(x1, xs01)[1], CRNGP$COV(x1, xs02)[1])
+    # COV2 = c( COV2, CRNGP$COV(x2, xs01)[1], CRNGP$COV(x2, xs02)[1])
+    # 
+    # COV_dif = COV1 - COV2
+    # 
+    # SIGT = COV_dif * (1 / SDx)
+    # 
+    # MM   = c(Mr, CRNGP$MU(xs01), CRNGP$MU(xs02))
+    # 
     
-    if (all(x1==x2)) return(rep(0, CRNGP$dims*2))
+    O = Forward(xs1xs2)
     
-    # if(xs[1]==75)browser()
-    # if x is in the set Xr
-    # repeats = apply(Xr, 1, function(xi)all(xi[D]==x1[D])) | apply(Xr, 1, function(xi)all(xi[D]==x2[D]))
-    # if (any(repeats)){Xr = Xr[!repeats,]; iKr = iKr[!repeats,]; Mr = Mr[!repeats]}
+    # O = lapply(KGCBfilter_grad(MM, SIGT), function(f)ratio*0.5*f)
+    
+    
     # browser()
-    VARx = abs(abs(CRNGP$COV(x1, x1)) + abs(CRNGP$COV(x2, x2)) - 2*CRNGP$COV(x1, x2) )[1]
-    SDx  = sqrt(VARx)
-    
-    P1 = CRNGP$kernel(Xr, x1)
-    P2 = CRNGP$kernel(Xr, x2)
-    Nr = P1 > 0.001 | P2 > 0.001
-    
-    COV1     = rep(0, length(P1))
-    COV1[Nr] = P1[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, x1)
-    
-    COV2     = rep(0, length(P1))
-    COV2[Nr] = P2[Nr] - iKr[Nr,]%*%CRNGP$kernel(CRNGP$xd, x2)
-    
-    xs01  = matrix( c(x1[D], 0), 1)
-    xs02  = matrix( c(x2[D], 0), 1)
-    
-    COV1 = c( COV1, CRNGP$COV(x1, xs01)[1], CRNGP$COV(x1, xs02)[1])
-    COV2 = c( COV2, CRNGP$COV(x2, xs01)[1], CRNGP$COV(x2, xs02)[1])
-    
-    COV_dif = COV1 - COV2
-    
-    SIGT = COV_dif * (1 / SDx)
-    
-    MM   = c(Mr, CRNGP$MU(xs01), CRNGP$MU(xs02))
-    
-    O = lapply(KGCBfilter_grad(MM, SIGT), function(f)ratio*0.5*f)
-    
-    if(O$KG>topKG){
-      topKG <<- O$KG
-      topX <<-  rbind(x1,x2)
-    }
-    
-    # browser()
-    Nr = Nr & abs(O$dsig[1:(length(O$dsig)-2)])>0
+    Nr      = O$Nr & abs(O$dsig[1:(length(O$dsig)-2)])>0
+    dmu     = O$dmu*0.5
+    dsig    = O$dsig*0.5
+    COV_dif = O$COV_dif
+    SDx     = O$SDx
+    VARx    = SDx^2
     
     # browser()
     
     ul = function(L)sapply(L,I)
     
     # First dKG/dmu * dmu/dx12
-    dkg.dmu = O$dmu[length(O$dmu) + rep(c(-1, 0),each=CRNGP$dims)]
+    dkg.dmu = dmu[length(dmu) + rep(c(-1, 0),each=CRNGP$dims)]
     dMM = ul( c(CRNGP$DTheta(x1[D]), CRNGP$DTheta(x2[D])) )
     
     # Second dKG/dsig * dsig/dx12
@@ -899,7 +1042,7 @@ Make_PWKG_grad = function(CRNGP, Xr, ratio=1){
     
     dSIGT = (dCOV - outer(COV_dif, dSD)*(0.5/VARx)) *(1/SDx)
     
-    dPWKG = dkg.dmu*dMM + as.numeric(O$dsig%*%dSIGT)
+    dPWKG = dkg.dmu*dMM + as.numeric(dsig%*%dSIGT)
     
     dPWKG
     
@@ -942,7 +1085,7 @@ MCMC_PWKG_grad = function(CRNGPs, Xr, ratio=1,
   topxs = 0
   topPW = FALSE
   
-  
+  dims = CRNGPs[[1]]$dims
   new_seed = max(CRNGPs[[1]]$xd[,CRNGPs[[1]]$dims+1]) + 1
   
   if(length(CRNGPs)==1){
@@ -1033,11 +1176,21 @@ MCMC_PWKG_grad = function(CRNGPs, Xr, ratio=1,
   
   # A = EI_optimizer(PWKG, cbind(CRNGPs[[1]]$XRAN, CRNGPs[[1]]$XRAN))
   
+  # Optimize KG the normal way
   A = Optimizer_2(KG, dKG, CRNGPs[[1]]$XRAN,
                   N0=N0,
                   Na=Na,
                   maxevals=maxevals)
   
+  # optimize the pairwise assuming the first point maximises KG
+  PWKG2 = function(x)PWKG(c(x, topxs[1:dims]))
+  DPWKG2 = function(x)dPWKG(c(x, topxs[1:dims]))[1:dims]
+  A = Optimizer_2(PWKG2, dPWKG2, CRNGPs[[1]]$XRAN,
+                  N0=N0,
+                  Na=Na,
+                  maxevals=maxevals)
+  
+  # optimize pairwise with lots of random starts
   A = Optimizer_2(PWKG, dPWKG, cbind(CRNGPs[[1]]$XRAN, CRNGPs[[1]]$XRAN),
                   N0 = PN0,
                   Na = PNa,

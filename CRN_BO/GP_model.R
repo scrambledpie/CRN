@@ -38,6 +38,7 @@ LhoodBuilder  = function(xd, yd, with_prior=F, XRAN=NULL){
     all(is.finite(yd))
   )
   
+  yd = yd[1:length(yd)]
   if(with_prior){
     cat(" Lhoodbuilding with prior, ")
     LX_PriorMean = XRAN[2,] - XRAN[1,]
@@ -112,6 +113,8 @@ LhoodBuilder  = function(xd, yd, with_prior=F, XRAN=NULL){
     KK <<- Theta[dims+1]*SE + Theta[dims+2]*diag(NX)
     
     minl = Inf
+    
+    # browser()
     
     inv_KK <<- rcppeigen_invert_matrix(KK)
     alpha <<- ydm %*% inv_KK
@@ -233,6 +236,14 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
   
   initialize = function(xd, yd, XRAN, copula=F){
     
+    stopifnot(
+      all(XRAN[1,]<XRAN[2,]), 
+      length(yd)==nrow(xd),
+      length(dim(xd))==2
+    )
+    
+    yd = yd[1:length(yd)]
+    
     self$copula  = copula
     self$dims    = ncol(xd)-1
     self$npars   = self$dims*2 + 3
@@ -249,9 +260,15 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     
   },
   
-  Lhood_Prep = function(){
+  Lhood_Prep = function(ymean=NULL){
+    
     cat("prepping Lhood, ")
     
+    if (is.null(ymean)){
+      self$ymean = mean(self$yd)
+    }else{
+      self$ymean = ymean
+    }
     
     
     self$LX_PriorMean = self$XRAN[2,] - self$XRAN[1,]
@@ -290,6 +307,7 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     
     dd = self$dims 
     if(length(Hpars)!=dd*2+4)stop("LHprior wrong input length hpars, get ", length(Hpars))
+    
     # length scale prior log density
     PLX = sum(-0.5*(Hpars[1:dd]-self$LX_PriorMean)^2*self$LX_PriorPrec)
     
@@ -643,7 +661,7 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
       oldHP = NULL
     }
     
-    topHP = Optimizer_2(LFUNS$LH, LFUNS$DLH, rbind(LFUNS$lo, LFUNS$hi), x0=oldHP)$xmax
+    topHP = Optimizer_2(LFUNS$LH, LFUNS$DLH, rbind(LFUNS$lo, LFUNS$hi), x0=oldHP, maxevals = 100)$xmax
     
     topHP = exp(topHP)
     
@@ -1310,8 +1328,8 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     
   },
   kernel = function(x1,x2){
-    # x1 = Check_X(x1, self$dims, T, "GP kernel x1")
-    # x2 = Check_X(x2, self$dims, T, "GP kernel x2")
+    x1 = Check_X(x1, self$dims, T, "GP kernel x1")
+    x2 = Check_X(x2, self$dims, T, "GP kernel x2")
     
     return(Rcpp_Kernel(x1, x2, self$HP))
   },
@@ -1346,9 +1364,11 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     
   },
   dkernel.dx1 = function(x1,x2){
-    # x1 = Check_X(x1, self$dims, T, "GP dkernel/dx1")
-    # x2 = Check_X(x2, self$dims, T, "GP dkernel/dx2")
+    x1 = Check_X(x1, self$dims, T, "GP dkernel/dx1")
+    x2 = Check_X(x2, self$dims, T, "GP dkernel/dx2")
     
+    DK = Rcpp_dKernel_dx1(x1, x2, self$HP)
+      
     return(lapply(1:self$dims, function(d)DK[1:nrow(x1) + nrow(x1)*(d-1), ,drop=F]))
   },
   MU     = function(x){
@@ -1401,9 +1421,9 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     
     iCxx  = 1/sqrt(abs(self$COV(x1, x1)[1]))
     
-    C_xr  = self$kernel(x1, xr) - self$kernel(x1,self$xd)%*%iKxr
+    C_xr  = self$kernel(x1, xr) - self$kernel(x1, self$xd)%*%iKxr
     
-    C_x0  = self$COV( c(x1[1:self$dims],0), x1)[1]
+    C_x0  = self$COV( matrix(c(x1[1:self$dims],0),1), x1)[1]
     
     c(C_xr, C_x0) * iCxx
     
@@ -1418,13 +1438,15 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     if(length(x1)!=self$dims+1)stop("only can do one point in dsigt/dx!")
     
     Cxx   = self$COV(x1, x1)[1]
-    iC_xx = 1/Cxx
     dC_xx = sapply( self$dCOVxx.dx(x1), I)
     
-    C_xr  = as.numeric( self$kernel(x1, self$xd)%*%iKxr )
-    dC_xr = sapply( self$dCOV.dx1(x1,xr,iKxr), I)
+    iC_xx = 1/Cxx
     
-    C_x0  = self$COV( matrix(c(x1[1:self$dims],0),1), x1)[1]
+  
+    C_xr  = as.numeric(self$kernel(x1,xr) - self$kernel(x1, self$xd)%*%iKxr )
+    dC_xr = sapply( self$dCOV.dx1(x1, xr, iKxr), I)
+    
+    C_x0  = self$COV( matrix(c(x1[1:self$dims],0), 1), x1)[1]
     dC_x0 = sapply( self$dCOVxx0.dx(x1), I)
     
     C_x = c(C_xr, C_x0)
