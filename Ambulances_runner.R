@@ -52,11 +52,11 @@ ran = attr(TestFun, 'ran')
 
 # pick the algortihm from the list
 source('CRN_BO/Optimizers.R')
-ALGORITHMS = c(1, 
-               BO_KG, 
-               1, 
-               BO_CRNKG_CS, 
-               BO_PWKG_CS, 
+ALGORITHMS = c(1,
+               BO_KG,
+               1,
+               BO_CRNKG_CS,
+               BO_PWKG_CS,
                BO_CRNKG_CSW,
                BO_PWKG_CSW,
                BO_CRNKG_CS_allseeds,
@@ -66,7 +66,7 @@ ALGORITHMS = c(1,
 # exectute the optimizer
 AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
 
-AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=NULL, Ns=1,
+AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=2000, Ns=1,
             N0  = 1000, Na  = 5, maxevals  = 50,
             PN0 = 4000, PNa = 10, Pmaxevals = 100)
 cat("Finished and Saved ", filename)
