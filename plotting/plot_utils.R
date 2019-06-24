@@ -105,18 +105,43 @@ Get_multiple_seed_reuse = function(R, M){
 # barchart of seed frequencies
 Get_seed_bars = function(R, topseed=500){
   
-  seeds = lapply(R, function(R)R$x[,ncol(R$x)])
-  
-  get_feqs = function(S)sapply(1:topseed, function(si)sum(si%in%S))
-  
+  N0 = min(sapply(R, function(Ri)min(Ri$Cost$N)))
+
+  seeds = lapply(R, function(Ri)Ri$x[1:N0,ncol(Ri$x)])
+  get_freqs = function(Seeds)sapply(1:topseed, function(si)sum(si==Seeds))
   Freqs = sapply(seeds, get_freqs)
+  mean_F0 = apply(Freqs, 1, mean)
   
-  mean_F = apply(Freqs, 1, mean)
+  seeds = lapply(R, function(Ri)Ri$x[-(1:N0),ncol(Ri$x)])
+  get_freqs = function(Seeds)sapply(1:topseed, function(si)sum(si==Seeds))
+  Freqs = sapply(seeds, get_freqs)
+  mean_F1 = apply(Freqs, 1, mean)
   
-  mean_F = mean_F[mean_F>0]
+  
+  mean_F = rbind(mean_F0, mean_F1)
+  # non_empty  = apply(mean_F, 2, sum)>0 
+  # mean_F = mean_F[, non_empty]
   
   return(mean_F)
   
+}
+Get_seed_pairs_singles = function(R, topseed=500){
+  
+  N0 = min(sapply(R, function(Ri)min(Ri$Cost$N)))
+  
+  seeds = lapply(R, function(Ri)Ri$x[-(1:N0),ncol(Ri$x)])
+  get_freqs = function(Seeds)sapply(1:topseed, function(si)sum(si==Seeds))
+  Freqs = sapply(seeds, get_freqs)
+  
+  Freqs_to_pairs = function(freq)c(sum(freq==1), 2*sum(freq==2))
+  singles_pairs = apply(Freqs, 2, Freqs_to_pairs)
+  
+  
+  mean_PW = apply(singles_pairs, 1, mean)
+  # non_empty  = apply(mean_F, 2, sum)>0 
+  # mean_F = mean_F[, non_empty]
+  
+  return(mean_PW)
 }
 
 # Get the ranges of matrices

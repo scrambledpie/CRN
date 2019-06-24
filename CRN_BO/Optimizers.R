@@ -111,7 +111,8 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
                         Lhoods = self$Lhoods,
                         Ymean  = self$Ymean,
                         Timing = self$Timing,
-                        .Random.seed = .Random.seed
+                        .Random.seed = .Random.seed,
+                        methodname = class(self)[1]
           )
           saveRDS(Output,paste("EachData1/", myID, sep=""))
           cat(" done\n")
@@ -378,4 +379,38 @@ BO_PWKG_CSW = R6Class("BO_PWKG_CSW",
      }
   )
 )
+
+
+RANDOM_SEARCH = R6Class("RandS", inherit = OptimizerBase,
+  public = list(
+    x = NULL,
+    y = NULL,
+    BOseed = 1,
+    optimize = function(Budget=500, Ns = 10, BOseed=1,...){
+      
+      set.seed(BOseed)
+      dims = ncol(self$ran)
+      ddx = self$ran[2,] - self$ran[1,]
+      X = sapply(1:dims, function(d)runif(Budget, self$ran[1,d], self$ran[2,d]))
+      S = sample(1:Ns, replace = T, size = Budget)
+      XS = cbind(X, S)
+      Y  = self$TestFun(XS)
+      
+      RecX_i = sapply(1:Budget, function(n)which.max(Y[1:n]))
+      
+      uI = unique(RecX_i)
+      uY = TestFun(cbind(X[uI,], 0))
+      map = sapply(RecX_i, function(ri)which(ri==uI))
+      P = uY[map]
+      
+      self$Cost = data.frame(N=1:Budget, P=P)
+      self$RecX = lapply(1:Budget, function(n)X[RecX_i[n],])
+      self$x = X
+      self$y = Y
+    }
+  )
+)
+
+
+
 

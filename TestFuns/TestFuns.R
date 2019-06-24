@@ -881,7 +881,7 @@ Build_GP_TestFun = function(seed, dims, TPars){
 ########################################################################################################
 # Ambulance
 
-Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5){
+Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, NumCalls = 30){
   Rcpp::sourceCpp('TestFuns/Ambulances.cpp')
   cat(" Ambulances.cpp compilation complete. ")
   
@@ -890,7 +890,7 @@ Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5){
     # cat("calling makestream\n")
     set.seed(10000*baseseed+s)
     
-    NumCalls = 30
+    # NumCalls = 
     
     CallTimes = lapply(1:runlength, function(r)cumsum( rexp(NumCalls, rate = 1/60) ))
     
