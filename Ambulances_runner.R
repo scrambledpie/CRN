@@ -46,7 +46,7 @@ if(!debug){
 
 # Make the TestFunction
 source('TestFuns/TestFuns.R')
-TestFun = Build_Ambulance_Testfun(BOseed, 10000, 1)[[1]]
+TestFun = Build_Ambulance_Testfun(BOseed, numtestseeds=60000, runlength=1, NumCalls=5)[[1]]
 ran = attr(TestFun, 'ran')
 
 
@@ -67,7 +67,7 @@ AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
 
 
 # exectute the optimizer
-AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=2000, Ns=1,
+AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=NULL, Ns=1,
             N0  = 1000, Na  = 5, maxevals  = 50,
             PN0 = 4000, PNa = 10, Pmaxevals = 100)
 cat("Finished and Saved ", filename)

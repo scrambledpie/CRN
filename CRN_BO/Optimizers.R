@@ -240,7 +240,7 @@ BO_KG = R6Class("BO_KG",
 BO_CRNKG_CS = R6Class("BO_CRNKG_CS",
   inherit = BO_base,
   public = list(
-    method = 8,
+    method = 4,
     optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,num_ref_x=NULL,Ns=NULL,...){
       
       # define a function that suggests the next x to evaluate
@@ -264,7 +264,7 @@ BO_CRNKG_CS = R6Class("BO_CRNKG_CS",
 BO_CRNKG_CSW = R6Class("BO_CRNKG_CSW",
   inherit = BO_base,
   public = list(
-    method = 9,
+    method = 6,
     optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,num_ref_x=NULL, Ns=NULL,...){
       
       # define a function that suggests the next x to evaluate
@@ -288,7 +288,7 @@ BO_CRNKG_CSW = R6Class("BO_CRNKG_CSW",
 BO_CRNKG_CS_allseeds = R6Class("BO_CRNKG_CS_allseeds",
   inherit = BO_base,
   public = list(
-    method = 4,
+    method = 8,
     optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,num_ref_x=NULL, Ns=NULL,...){
       
       # define a function that suggests the next x to evaluate
@@ -312,7 +312,7 @@ BO_CRNKG_CS_allseeds = R6Class("BO_CRNKG_CS_allseeds",
 BO_CRNKG_CSW_allseeds = R6Class("BO_CRNKG_CSW_allseeds",
   inherit = BO_base,
   public = list(
-   method = 6,
+   method = 9,
    optimize = function(Budget0=20, Budget=500, N0=1000, Na=10, maxevals=100,num_ref_x=NULL,Ns=NULL,...){
      
      # define a function that suggests the next x to evaluate
