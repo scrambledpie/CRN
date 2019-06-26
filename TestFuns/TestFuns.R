@@ -1,5 +1,38 @@
 library(Rcpp)
 
+if (F){
+  Check_X = function(x, dims, withseeds, fname){
+    # Args
+    #   x: input vec or matrix
+    #   dims: number of continuous dims of x
+    #   withseeds: should the x include an integer seed aslast element
+    #   fname: printed with the error message
+    #
+    # Returns
+    #   x: correctly formatted as a matrix
+    
+    dimsN = dims + withseeds
+    
+    if (dims==1&is.null(dim(x))&!withseeds){ cat(fname, "converting x to matrix"); x = matrix(x, ncol=1)}
+    
+    if (length(x)==dimsN & length(dim(x))==0){ cat(fname, "converting x to matrix"); x = matrix(x, ncol=dimsN, nrow=1)}
+    
+    if (length(x)%%dimsN!=0) stop(fname, " wrong length input, got ", length(x))
+    
+    if (length(dim(x))!=2) stop(fname, "wrong input dim, got ", dim(x))
+    
+    if (ncol(x)!=dimsN) stop(fname, "wrong # input columns, got ", ncol(x))
+    
+    if (withseeds & !all(x[,dimsN]%%1==0)) stop(fname, "non-integer seeds not allowed")
+    
+    if (withseeds & !all(x[,dimsN]>=0)) stop(fname, "negative seeds not allowed")
+    
+    x
+  }
+}else{
+  Check_X = function(x, dims, withseeds, fname) x
+}
+
 LHCdim = function(N0, dims){
   # Args
   #   N0: the number of points to generate
@@ -928,6 +961,79 @@ Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, 
     
     out = sapply(1:RV$runlength, function(k){
       Ambulances_Square(xs, RV$CallTimes[[k]], RV$CallLocs[[k]], RV$Stimes[[k]])
+    })
+    return(-mean(out))
+  }
+  
+  TestFun = function(xs){
+    cat("\nRunning Ambulance sim...")
+    if (is.null(dim(xs)))xs = matrix(xs, 1)
+    xs = Check_X(xs, 6, T, "Ambulance cpp")
+    out = 1:nrow(xs)
+    for(i in 1:nrow(xs))out[i] = TestFun_i(xs[i,])
+    cat("done, ")
+    out
+  }
+  
+  Get_RV = function() TestStreams
+  
+  Get_simcalls = function()simcalls
+  
+  attr(TestFun, 'ran') = rbind(rep(0,6), rep(20,6))
+  attr(TestFun, 'name') = "Ambulances"
+  
+  c(TestFun, Get_RV, Get_simcalls)
+  # TestFun
+}
+
+Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, Simtime=1800){
+  Rcpp::sourceCpp('TestFuns/Ambulances.cpp')
+  cat(" Ambulances.cpp compilation complete. ")
+  
+  simcalls = 0 
+  Make_Stream = function(s, runlength, baseseed){
+    # cat("calling makestream\n")
+    set.seed(10000*baseseed+s)
+    
+    
+    NumCalls = 2 * 30 * Simtime/1800
+    
+    CallTimes = lapply(1:runlength, function(r)cumsum( rexp(NumCalls, rate = 1/60) ))
+    
+    CallLocs  = lapply(1:runlength, function(r){
+      CallLocs_r = matrix(0, 0, 2)
+      while (nrow(CallLocs_r)<NumCalls){
+        Calls = round(2*( NumCalls - nrow(CallLocs_r) ))
+        u = matrix(runif(3*Calls), Calls, 3)
+        Acc = 1.6*u[,3] <= 1.6 - abs(u[,1]-0.8) - abs(u[,2]-0.8)
+        CallLocs_r = rbind(CallLocs_r, u[Acc, 1:2])
+      }
+      CallLocs_r = CallLocs_r[1:NumCalls,]
+    })
+    
+    Stimes    = lapply(1:runlength, function(r)rgamma(NumCalls, shape=9, scale = 1/12))
+    
+    list(CallTimes=CallTimes, CallLocs=CallLocs, Stimes=Stimes, runlength=runlength)
+    
+  }
+  
+  TestStreams = Make_Stream(0, numtestseeds*runlength, baseseed)
+  
+  TestFun_i = function(xs){
+    
+    if(xs[7]==0){
+      RV = TestStreams
+    }else{
+      # Generate new RNG streams
+      RV = Make_Stream(xs[7], runlength, baseseed)
+    }
+    
+    xs = matrix(xs[1:6], 3,2)*0.05
+    
+    simcalls <<- simcalls + RV$runlength
+    
+    out = sapply(1:RV$runlength, function(k){
+      Ambulances_Square_timed(xs, RV$CallTimes[[k]], RV$CallLocs[[k]], RV$Stimes[[k]], Simtime)
     })
     return(-mean(out))
   }

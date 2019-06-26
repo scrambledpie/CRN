@@ -162,6 +162,131 @@ double Ambulances_Square(NumericMatrix bases,
   return(mean(AmbArrTimes-CallTimes));
 }
 
+// [[Rcpp::export]]
+double Ambulances_Square_timed(NumericMatrix bases, 
+                               NumericVector CallTimes,
+                               NumericMatrix CallLocs,
+                               NumericVector ServTimes,
+                               double Simtime){
+  
+  
+  double velfk = 60; double vf = velfk/30; double ivf = 1/vf;
+  double velsk = 40; double vs = velsk/30;
+  int nA = bases.nrow();
+  int NumCalls = CallLocs.nrow();
+  int NumLate = 0;
+  
+  double xcall, ycall, xb, yb, xlc, ylc;
+  double Ddriven, Tgap, minD2call, D2call, depart;
+  int closestA;
+  
+  NumericVector ExitTimes(NumCalls);
+  NumericVector AmbArrTimes(NumCalls);
+  NumericVector closestAhist(NumCalls);
+  NumericVector minDcall(NumCalls);
+  
+  
+  // Stores all info about ambulances
+  NumericMatrix Ambulances(nA, 5);
+  for (int j=0; j<nA; j++){
+    Ambulances(j,1) = bases(j,0);
+    Ambulances(j,2) = bases(j,1);
+    Ambulances(j,3) = bases(j,0);
+    Ambulances(j,4) = bases(j,1);
+  }
+  
+  for(int t=0; t<NumCalls; t++){
+    
+    
+    if (CallTimes(t)>Simtime){
+    
+      // Rcout << t << std::endl;
+      // Rcout << CallTimes(t-1) << std::endl;
+      // Rcout << CallTimes(t) << std::endl;
+      // 
+      // double traveltime = 0.0;
+      // for (int ti=0; ti<t; ti++){traveltime += AmbArrTimes(ti) - CallTimes(ti);};
+      // return(traveltime);
+      
+      return(mean(AmbArrTimes[CallTimes<Simtime]-CallTimes[CallTimes<Simtime]));
+      
+    }
+    
+    
+    // Oh no, someone is hurt! Where are they!?
+    xcall = CallLocs(t,0);
+    ycall = CallLocs(t,1);
+    
+    closestA = -1;
+    minD2call = 1000;
+    
+    // Check all the ambulances! Are they free??
+    for (int j=0; j<nA; j++){
+      
+      
+      Tgap = CallTimes(t) - Ambulances(j,0);
+      
+      // Is this ambulance available?
+      if(Tgap>0){
+        Ddriven = Tgap*vs;
+        
+        xlc = Ambulances(j, 1);
+        ylc = Ambulances(j, 2);
+        xb  = Ambulances(j, 3);
+        yb  = Ambulances(j, 4);
+        
+        D2call = Dist2Call(xcall, ycall, xb, yb, xlc, ylc, Ddriven);
+        
+        if(D2call<minD2call){
+          minD2call = D2call;
+          closestA = j;
+        }
+      }
+      
+      
+    }
+    
+    // finished checking ambulances!
+    
+    if (closestA >-1){
+      // If one was available, it departs ASAP!
+      depart = CallTimes(t);
+      
+    }else{
+      // No ambulance available, so let's get the quickest one!
+      NumLate +=1;
+      
+      depart = min(Ambulances(_,0));
+      closestA = which_min(Ambulances(_,0));
+      
+      xlc = Ambulances(closestA, 1);
+      ylc = Ambulances(closestA, 2);
+      
+      minD2call = abs2(xlc-xcall) + abs2(ylc-ycall);
+      
+      // Rcout << "No free ambulances! Nearest one is free" << depart << std::endl;
+    }
+    
+    AmbArrTimes(t)          = depart +  minD2call*ivf;
+    ExitTimes(t)            = AmbArrTimes(t) + ServTimes(t);
+    Ambulances(closestA, 0) = ExitTimes(t);
+    Ambulances(closestA, 1) = xcall;
+    Ambulances(closestA, 2) = ycall;
+    
+    closestAhist(t) = closestA;
+    minDcall(t) = minD2call;
+  }
+  
+  // return Rcpp::List::create(
+  //   Rcpp::Named("AmbArr") = AmbArrTimes,
+  //   Rcpp::Named("ExitTimes") = ExitTimes,
+  //   Rcpp::Named("closestA") = closestAhist,
+  //   Rcpp::Named("minDcall") = minDcall,
+  //   Rcpp::Named("NumLate") = NumLate,
+  //   Rcpp::Named("A") = Ambulances
+  // );
+  return(mean(AmbArrTimes-CallTimes));
+}
 
 // You can include R code blocks in C++ files processed with sourceCpp
 // (useful for testing and development). The R code will be automatically 
