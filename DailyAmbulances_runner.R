@@ -77,7 +77,7 @@ cat("Finished and Saved ", filename)
 
 # Make the TestFunction
 source('TestFuns/TestFuns.R')
-TestFuns= Build_DailyAmbulance_Testfun(BOseed, numtestseeds=60000, runlength=1, Simtime=1800)
+TestFuns= Build_DailyAmbulance_Testfun(BOseed, numtestseeds=10000, runlength=1, Simtime=1800)
 
 
 cat(TestFuns[[1]](c(runif(6), 1)))

@@ -199,16 +199,17 @@ double Ambulances_Square_timed(NumericMatrix bases,
     
     
     if (CallTimes(t)>Simtime){
-    
+      // End the simulation if simtime has elapsed
+      
       // Rcout << t << std::endl;
       // Rcout << CallTimes(t-1) << std::endl;
       // Rcout << CallTimes(t) << std::endl;
-      // 
-      // double traveltime = 0.0;
-      // for (int ti=0; ti<t; ti++){traveltime += AmbArrTimes(ti) - CallTimes(ti);};
-      // return(traveltime);
+
+      double traveltime = 0.0;
+      for (int ti=0; ti<t; ti++){traveltime += AmbArrTimes(ti) - CallTimes(ti);};
+      return(traveltime/(double)t);
       
-      return(mean(AmbArrTimes[CallTimes<Simtime]-CallTimes[CallTimes<Simtime]));
+      // return(mean(AmbArrTimes[CallTimes<Simtime]-CallTimes[CallTimes<Simtime]));
       
     }
     
