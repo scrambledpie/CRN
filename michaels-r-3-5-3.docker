@@ -26,3 +26,4 @@ COPY legacyfile /legacyfile
 COPY TestFuns /TestFuns
 COPY *.R /
 
+ADD RUN_DAILYAMBULANCES.sh /
