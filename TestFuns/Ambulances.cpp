@@ -6,7 +6,7 @@ double abs2(double x){
   return std::abs(x);
 }
 
-// [[Rcpp::export]]
+
 double Dist2Call(double xcall,
                  double ycall,
                  double xb,
