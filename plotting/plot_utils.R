@@ -68,6 +68,48 @@ Get_multiple_OC = function(R, M, with_max=F){
   
 }
 
+Get_Hypers_mean_var = function(R, hyper=NULL){
+  # args: R, list of results from one algorithm
+  # returns: N*3 matrix
+  
+  if (is.null(hyper))hyper=length(tail(R[[1]]$Hpars, 1)[[1]])
+  
+  Nran = sapply(R, function(r)range(r$Cost$N))
+  Nvals= round(Nran[1]):round(Nran[2])
+  
+  get_hps = function(r){
+    
+    hps = sapply(Nvals, function(ni){
+      if(ni > length(r$Hpars)) return(NA)
+      if (is.null(r$Hpars[[ni]][hyper])) return(NA)
+      return(r$Hpars[[ni]][hyper])
+    })
+    
+    return(hps)
+  }
+
+  HP   = sapply(R, get_hps)
+  
+  R_mean = apply(HP,1, safe_ME)
+  R_ser  = apply(HP,1, safe_SE)
+  
+  cbind(Nvals, R_mean, R_ser)
+  
+}
+Get_multiple_Hypers = function(R, M, hyper=NULL){
+  stopifnot(
+    length(R)==length(M),
+    typeof(R)=="list",
+    typeof(M)%in%c("integer", "double"),
+    typeof(hyper)%in%c("integer", "double")
+  )
+  
+  uM = sort(unique(M))
+  
+  lapply(uM, function(mi)Get_Hypers_mean_var(R[M==mi], hyper))
+  
+}
+
 # seed reuse time series
 Get_seed_reuse = function(R){
   
@@ -293,7 +335,7 @@ Seeds_barplot = function(R1=Results){
 
 
 # given a set of OC results matrices, plots the whole lot on a single axes.
-Res_plot = function(R, cols=2:100, xr=NULL, yr=NULL, xlab="", ylab="", main="", log=""){
+Res_plot = function(R, cols=2:100, xr=NULL, yr=NULL, xlab="", ylab="", main="", log="", erscale=1){
   # R: list of N*3 matrices, each with cols N, OC, and se(OC)
   
   if(is.null(xr)) xr = Get_xy_ran(R)$xr
@@ -302,7 +344,9 @@ Res_plot = function(R, cols=2:100, xr=NULL, yr=NULL, xlab="", ylab="", main="", 
   Empty_plot(xr, yr, xlab=xlab, ylab=ylab, main=main, log=log)
   
   k=1
-  for(Ri in R){Plot_mean_er(Ri, cols[k]); k=k+1}
+  
+  
+  for(Ri in R){Ri[,3] = erscale*Ri[,3]; Plot_mean_er(Ri, cols[k]); k=k+1}
   
 }
 
