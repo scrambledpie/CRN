@@ -140,7 +140,7 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
       if(learn_kernel==0) kk = 5
       if(learn_kernel==1) kk = 1
       if(learn_kernel==2) kk = 3
-      OptimSteps = c(20:200, seq(205, 300, 5), seq(310, 400, 10), seq(420, 500, 20))
+      OptimSteps = c(20:200, seq(205, 300, 5), seq(310, 400, 10), seq(420, 500, 20), seq(550, 1000, 50))
       
       loadsuccess = self$Checkpoint(tryload = T)
       
