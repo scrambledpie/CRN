@@ -207,7 +207,7 @@ double Ambulances_Square_timed(NumericMatrix bases,
 
       double traveltime = 0.0;
       for (int ti=0; ti<t; ti++){traveltime += AmbArrTimes(ti) - CallTimes(ti);};
-      return(traveltime/(double)t);
+      return(traveltime);
       
       // return(mean(AmbArrTimes[CallTimes<Simtime]-CallTimes[CallTimes<Simtime]));
       
