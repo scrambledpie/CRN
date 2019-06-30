@@ -163,7 +163,7 @@ double Ambulances_Square(NumericMatrix bases,
 }
 
 // [[Rcpp::export]]
-double Ambulances_Square_timed(NumericMatrix bases, 
+NumericVector Ambulances_Square_timed(NumericMatrix bases, 
                                NumericVector CallTimes,
                                NumericMatrix CallLocs,
                                NumericVector ServTimes,
@@ -205,10 +205,16 @@ double Ambulances_Square_timed(NumericMatrix bases,
       // Rcout << CallTimes(t-1) << std::endl;
       // Rcout << CallTimes(t) << std::endl;
 
-      double traveltime = 0.0;
-      for (int ti=0; ti<t; ti++){traveltime += AmbArrTimes(ti) - CallTimes(ti);};
-      return(traveltime);
+      // double traveltime = 0.0;
+      // for (int ti=0; ti<t; ti++){traveltime += AmbArrTimes(ti) - CallTimes(ti);};
+      // return(traveltime);
       
+      NumericVector JourneyTimes(t);
+      for (int ti=0; ti<t; ti++){JourneyTimes(ti) = AmbArrTimes(ti) - CallTimes(ti);};
+      
+      // std::sort(JourneyTimes.begin(), JourneyTimes.end());
+        
+      return(AmbArrTimes - CallTimes);
       // return(mean(AmbArrTimes[CallTimes<Simtime]-CallTimes[CallTimes<Simtime]));
       
     }
@@ -286,7 +292,7 @@ double Ambulances_Square_timed(NumericMatrix bases,
   //   Rcpp::Named("NumLate") = NumLate,
   //   Rcpp::Named("A") = Ambulances
   // );
-  return(mean(AmbArrTimes-CallTimes));
+  return(AmbArrTimes-CallTimes);
 }
 
 // You can include R code blocks in C++ files processed with sourceCpp

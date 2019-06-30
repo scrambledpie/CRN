@@ -986,7 +986,7 @@ Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, 
   # TestFun
 }
 
-Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, Simtime=1800){
+Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, Simtime=1800, reduce_out=mean){
   Rcpp::sourceCpp('TestFuns/Ambulances.cpp')
   cat(" Ambulances.cpp compilation complete. ")
   
@@ -1033,7 +1033,11 @@ Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlengt
     simcalls <<- simcalls + RV$runlength
     
     out = sapply(1:RV$runlength, function(k){
-      Ambulances_Square_timed(xs, RV$CallTimes[[k]], RV$CallLocs[[k]], RV$Stimes[[k]], Simtime)
+      O = Ambulances_Square_timed(xs, RV$CallTimes[[k]], RV$CallLocs[[k]], RV$Stimes[[k]], Simtime)
+      sO = sort(O[O>0])
+      
+      quantile = sO[round(0.75*length(sO))]
+      return(quantile)
     })
     return(-mean(out))
   }
