@@ -1038,8 +1038,9 @@ Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlengt
       
       # quantile = sO[round(0.75*length(sO))]
       quantile = max(sO)
-      return(quantile)
+      return(-quantile)
     })
+    
     return(-mean(out))
   }
   

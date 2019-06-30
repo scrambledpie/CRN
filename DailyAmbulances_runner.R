@@ -23,7 +23,7 @@ if(!debug){
   # Optimization Run
   method = Methods[myID]
   BOseed = BOseeds[myID]
-  Ns0 = 5
+  Ns0    = 5
   Budget = as.integer(Args[2])
   filename = paste(c(myID, "AMB", method, BOseed), collapse = "_")
   
@@ -74,11 +74,11 @@ AA$optimize(Budget0 = 20, Budget = Budget, num_ref_x=NULL, Ns=1,
 cat("Finished and Saved ", filename)
 
 
-
-# Make the TestFunction
-source('TestFuns/TestFuns.R')
-TestFuns= Build_DailyAmbulance_Testfun(BOseed, numtestseeds=10000, runlength=1, Simtime=1800)
-
-
-cat(TestFuns[[1]](c(runif(6), 1)))
-
+# 
+# # Make the TestFunction
+# source('TestFuns/TestFuns.R')
+# TestFuns= Build_DailyAmbulance_Testfun(BOseed, numtestseeds=10000, runlength=1, Simtime=1800)
+# 
+# 
+# cat(TestFuns[[1]](c(runif(6), 1)))
+# 

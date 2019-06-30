@@ -7,12 +7,13 @@ debug = length(Args)==0
 if(!length(Args)%in%c(0,2))stop("Give a jobID and Budget>20 as arguments")
 
 if(!debug){
+  
   # Running from terminal
   cat(CPU,"\n\n", commandArgs(), "\n\n")
   cat(getwd(),"\n\n")
   
   reps = 400
-  Methods = rep(c(2, 8, 9, 6, 7), each=reps)
+  Methods = rep(c(2, 4, 5, 6, 7), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   
   set.seed(1)
@@ -22,11 +23,12 @@ if(!debug){
   # Optimization Run
   method = Methods[myID]
   BOseed = BOseeds[myID]
-  Ns0 = 5
+  Ns0    = 5
   Budget = as.integer(Args[2])
   filename = paste(c(myID, "ATO", method, BOseed), collapse = "_")
   
 }else{
+  
   # running within Rstudio
   cat("Running locally \n")
   
@@ -44,7 +46,8 @@ if(!debug){
 
 # Make the TestFunction
 source('TestFuns/TestFuns.R')
-TestFun = Build_Xie_ATO_cpp_Testfun(BOseed, 2000, 1)[[1]]
+
+TestFun = Build_Xie_ATO_cpp_Testfun(BOseed, numtestseeds=2000, runlength=1)[[1]]
 ran = attr(TestFun, 'ran')
 
 
