@@ -1036,7 +1036,8 @@ Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlengt
       O = Ambulances_Square_timed(xs, RV$CallTimes[[k]], RV$CallLocs[[k]], RV$Stimes[[k]], Simtime)
       sO = sort(O[O>0])
       
-      quantile = sO[round(0.75*length(sO))]
+      # quantile = sO[round(0.75*length(sO))]
+      quantile = max(sO)
       return(quantile)
     })
     return(-mean(out))
