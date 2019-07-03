@@ -1037,8 +1037,8 @@ Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlengt
       sO = sort(O[O>0])
       
       # quantile = sO[round(0.75*length(sO))]
-      quantile = max(sO)
-      return(-quantile)
+      quantile = mean(sO)
+      return(quantile)
     })
     
     return(-mean(out))
@@ -1058,10 +1058,12 @@ Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlengt
   
   Get_simcalls = function()simcalls
   
+  Get_Streams = function(s)Make_Stream(s, runlength, baseseed)
+  
   attr(TestFun, 'ran') = rbind(rep(0,6), rep(20,6))
   attr(TestFun, 'name') = "Ambulances"
   
-  c(TestFun, Get_RV, Get_simcalls)
+  c(TestFun, Get_RV, Get_simcalls, Get_Streams)
   # TestFun
 }
 

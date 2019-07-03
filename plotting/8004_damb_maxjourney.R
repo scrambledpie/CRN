@@ -1,7 +1,7 @@
 setwd("/Users/pearce/CRN/")
 source("plotting/plot_utils.R")
 
-Results = readRDS("/Users/pearce/CopiedResults/8001")
+Results = readRDS("/Users/pearce/CopiedResults/8004")
 
 M = sapply(Results, function(r)r$method)
 
@@ -17,13 +17,12 @@ HP_16 = Get_multiple_Hypers(Results, M, 16)
 cols = rep("black",10)
 
 "
-Experiment 8001
- - ambulance, 1800s per sim, all results, KG, PW, CRN, 400 runs each, upto 1000 samples
- - objective: mean journey time
+Experiment 8004
+ - ambulance, 1800s per sim, all results, KG, PW, CRN, 400 runs each, optimizing the MAX of journey times
  - discretization is old obs and LHC
  - CRN KG optimizer evaluates all seeds at the final x.
  - PWKG optimizer does KG first, then does pair with first frozen then pair with both free
- - method numbers are a little fucked up in the results
+ - 
 "
 
 # M values

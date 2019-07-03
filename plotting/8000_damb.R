@@ -9,6 +9,7 @@ R = Get_multiple_OC(Results, M)
 
 S = Get_multiple_seed_reuse(Results, M)
 
+HP_7 = Get_multiple_Hypers(Results, M, 7)
 HP_14 = Get_multiple_Hypers(Results, M, 14)
 HP_15 = Get_multiple_Hypers(Results, M, 15)
 HP_16 = Get_multiple_Hypers(Results, M, 16)
@@ -40,27 +41,29 @@ cols[5] = "darkgreen" # CRNKG PW
 cols[6] = "green" #CRNKG CSW
 
 
-par(mfrow=c(3,3))
+par(mfrow=c(3,4))
 
 # FIRST ROW
 Res_plot(R, cols = cols, main = "Time to patient", erscale = 0)
 Res_plot(R, cols = cols, main = "Time to patient")
 Res_plot(S, cols=cols, main = "seed reuse")
-
+plot(1,1)
 
 # SECOND ROW
 CRNbars = Get_seed_bars(Results[M==4], 30)
 barplot(CRNbars, names.arg = 1:ncol(CRNbars), main="CRN CS", ylim=c(0, 200))
-
 CRNbars = Get_seed_bars(Results[M==6], 30)
 barplot(CRNbars, names.arg = 1:ncol(CRNbars), main="CRN wig", ylim=c(0, 200))
+
 
 CS_PWbars = Get_seed_pairs_singles(Results[M==5])
 CSW_PWbars = Get_seed_pairs_singles(Results[M==7])
 barplot(c(CS_PWbars, CSW_PWbars), main="PW: CS, CSW", names.arg=c("CS singles", "CS pairs", "CSW singles", "CSW pairs"))
 # barplot(CSW_PWbars, main="CSW_PW", names.arg=c("singles", "pairs"))
+plot(1,1)
 
 # THIRD ROW
+Res_plot(HP_7, cols=cols, main="signal")
 Res_plot(HP_14, cols=cols, main="wiggle")
 Res_plot(HP_15, cols=cols, main="offset")
 Res_plot(HP_16, cols=cols, main="noise")

@@ -1,7 +1,7 @@
 setwd("/Users/pearce/CRN/")
 source("plotting/plot_utils.R")
 
-Results = readRDS("/Users/pearce/CopiedResults/8001")
+Results = readRDS("/Users/pearce/CopiedResults/5006")
 
 M = sapply(Results, function(r)r$method)
 
@@ -9,21 +9,21 @@ R = Get_multiple_OC(Results, M)
 
 S = Get_multiple_seed_reuse(Results, M)
 
-HP_7 = Get_multiple_Hypers(Results, M, 7)
-HP_14 = Get_multiple_Hypers(Results, M, 14)
-HP_15 = Get_multiple_Hypers(Results, M, 15)
-HP_16 = Get_multiple_Hypers(Results, M, 16)
+HP_9 = Get_multiple_Hypers(Results, M, 9)
+HP_14 = Get_multiple_Hypers(Results, M, 18)
+HP_15 = Get_multiple_Hypers(Results, M, 19)
+HP_16 = Get_multiple_Hypers(Results, M, 20)
 
 cols = rep("black",10)
 
 "
-Experiment 8001
- - ambulance, 1800s per sim, all results, KG, PW, CRN, 400 runs each, upto 1000 samples
- - objective: mean journey time
+Experiment 85006
+ - ATO
+ - all results, KG, PW, CRN, 400 runs each
  - discretization is old obs and LHC
  - CRN KG optimizer evaluates all seeds at the final x.
  - PWKG optimizer does KG first, then does pair with first frozen then pair with both free
- - method numbers are a little fucked up in the results
+ - 
 "
 
 # M values
@@ -64,7 +64,7 @@ barplot(c(CS_PWbars, CSW_PWbars), main="PW: CS, CSW", names.arg=c("CS singles", 
 plot(1,1)
 
 # THIRD ROW
-Res_plot(HP_7, cols=cols, main="signal")
+Res_plot(HP_9, cols=cols, main="signal")
 Res_plot(HP_14, cols=cols, main="wiggle")
 Res_plot(HP_15, cols=cols, main="offset")
 Res_plot(HP_16, cols=cols, main="noise")
