@@ -188,11 +188,12 @@ BO_base_disc = R6Class("BO_base_disc",inherit = OptimizerBase,
 
         self$UpdateLogs(KG_time, eval_time, fit_time)
 
-        self$Checkpoint()
 
         RX = signif(tail(self$RecX,1)[[1]], 3)
         cat("Logs updated, RecX:", RX,", performance:", as.numeric(tail(self$Cost,1)), "\n\n\n")
       }
+      
+      self$Checkpoint()
 
     }
   )
@@ -246,7 +247,7 @@ BO_CRNKG_DISC = R6Class("BO_CRNKG_DISC",
 
         checkseeds = 1:(max(self$GP$xd[,ncol(self$GP$xd)])+1)
         KGvals = sapply(checkseeds, function(s)sapply(X_domain, function(xi)CRNKG(c(xi, s))))
-
+        
         newx = X_domain[ which.max(apply(KGvals, 1, max)) ]
         news = which.max(apply(KGvals, 2, max))
 

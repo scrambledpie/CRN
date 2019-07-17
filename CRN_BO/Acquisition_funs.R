@@ -276,7 +276,10 @@ KGCBfilter_grad = function(a,b){
   grad_b[new_order[A]] = -dC[-1] + dC[-length(dC)]
   # browser()
   
-  return(list(KG=KG_result, dmu=grad_a, dsig=grad_b))
+  output = list(KG=KG_result, dmu=grad_a, dsig=grad_b)
+  # print(output$KG)
+  
+  return(output)
   
 }
 
@@ -523,13 +526,22 @@ Make_CRNKG_grad = function(CRNGP, Xr){
   dd = CRNGP$dims+1
   maxVAR = 0.0001*CRNGP$HP[dd]
   
+  faultyKG_output = list(KG=0, 
+                         dmu=rep(0, length(Mr)+1),
+                         dsig=rep(0, length(Mr)+1))
+  
   
   Forward = function(xs){
     
     xs = matrix(xs, 1)
     xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
     
-    if (any( apply(CRNGP$xd,1,function(xdi)all(abs(xdi-xs)<1e-8)) )) return(0)
+    if (any( apply(CRNGP$xd,1,function(xdi)all(abs(xdi-xs)<1e-8)) )){
+      
+      # print("returning faulty goods")
+      return(faultyKG_output)
+      
+    }
 
     xs = matrix(xs,1)
     xs = Check_X(xs, CRNGP$dims, T, "CRNKG xs")
@@ -555,7 +567,8 @@ Make_CRNKG_grad = function(CRNGP, Xr){
     
     MM   = c(Mr, CRNGP$MU(xs0))
     
-    if(any(is.nan(SIGT))) return(0)
+    nanS = is.nan(SIGT)
+    if(any(nanS)) SIGT[nanS]=0
     
     O = KGCBfilter_grad(MM, SIGT)
     
