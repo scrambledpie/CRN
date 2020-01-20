@@ -1,7 +1,12 @@
 library(Rcpp)
 
+# Utilities for test functions.
 if (F){
   Check_X = function(x, dims, withseeds, fname){
+    # Performs sanity checks on inputs to testfunctions and reaises exceptions.
+    # Howver these checks are slow hence should only be used for debiugging.
+    # When running large experiments, this functions is replaced with a 
+    # direct passthrough.
     # Args
     #   x: input vec or matrix
     #   dims: number of continuous dims of x
@@ -33,304 +38,15 @@ if (F){
   Check_X = function(x, dims, withseeds, fname) x
 }
 
-LHCdim = function(N0, dims){
-  # Args
-  #   N0: the number of points to generate
-  #   dims: the box for scaling+centring samples
-  #   
-  # Returns
-  #   a randomly generated LHC of N0 points in [0,1]^dims
-  
-  sapply(1:dims, function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
-}
 
-LHCran = function(N0, ran){
-  # Args
-  #   N0: the number of points to generate
-  #   ran: the box for scaling+centring samples
-  #   
-  # Returns
-  #   a randomly generated LHC of N0 points in box ran dimensions
-  
-  if(length(ran)==2)ran=matrix(ran,ncol=1)
-  
-  if (any(ran[1,]>=ran[2,])|nrow(ran)!=2) stop("LHC bounds are not valid: ", paste(bottoms, tops, collapse=", "))
-  
-  dims = ncol(ran)
-  LHC1 = sapply(1:dims,function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
-  
-  BB = matrix(ran[1,], N0, length(ran[1,]), byrow=T)
-  CC = matrix(ran[2,]-ran[1,], N0, length(ran[1,]), byrow=T)
-  
-  BB + LHC1*CC
-}
 
-########################################################################################################
-# ATO
+#############################################################
+#                                                           #
+#                  Assemble-to-Order Simulator              #
+#                                                           #
+#############################################################
 
-old_RunATO = function(BaseStockLevel=rep(1,8), seed=1, runlength=5){
-
-  # Args:
-  #   BaseStockLEvel: target stock quantities for each product
-  #   runlength: integer, repetitions of the simulation
-  #   seed: integer, to force deterministic simulation
-  #
-  # Returns:
-  #   fnAvg: Average profit over runlength reps of simulation
-  
-  NumComponentType=8;               #% number of component types
-  
-  ProTimeMean = c(0.15, 0.4, 0.25, 0.15, 0.25, 0.08, 0.13, 0.4)
-  ProTimeStd = 0.15*ProTimeMean
-  Profit = 1:8
-  HoldingCost = matrix(2, 1, NumComponentType)
-  # % holding cost of each component in
-  # % inventory
-  # 
-  # % Parameters of Customers
-  
-  ArrivalRate = 12             #% assume Possion arrival
-  # %NumCustomerType=5;             % number of customer types
-  # %CustomerProb=[0.3,0.25,0.2,0.15,0.1];   % probability of each customer
-  KeyComponent=c(1,0,0,1,0,1,0,0,
-                 1,0,0,0,1,1,0,0,
-                 0,1,0,1,0,1,0,0,
-                 0,0,1,1,0,1,0,0,
-                 0,0,1,0,1,1,0,0)
-  KeyComponent = matrix(KeyComponent, nrow=5, byrow=TRUE)
-  
-  NonKeyComponent=c(0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,0,0,
-                    0,0,0,0,0,0,0,1,
-                    0,0,0,0,0,0,1,0)
-  NonKeyComponent = matrix(NonKeyComponent, nrow=5, byrow=TRUE)
-  
-  WarmUp = 20
-  TotalTime = 70
-  
-  #% Simulation
-  fnSum = 0.0
-  set.seed(seed)
-  
-  for (k in 1:runlength){
-    
-    # runif_preset = runif()
-    
-    EventTime = matrix(1e5, 1, 1+NumComponentType)
-    EventTime[1] = -log(runif(1))/ArrivalRate
-    TotalProfit = 0
-    TotalCost = 0
-    Inventory = BaseStockLevel
-    
-    Clock = 0
-    
-    while (Clock<TotalTime){
-      OldInventory = Inventory
-      OldClock = Clock
-      Clock = min(EventTime)
-      event = which.min(EventTime)
-      if (event==1){ # a customer has come!
-        
-        temp=runif(1)
-        if (temp<0.3){
-          CustomerType=1
-        }else if (temp<0.55){
-          CustomerType=2
-        }else if (temp<0.75){
-          CustomerType=3
-        }else if (temp<0.9){
-          CustomerType=4
-        }else{
-          CustomerType=5
-        }
-        
-        
-        
-        KeyOrder = KeyComponent[CustomerType,]
-        NonKeyOrder = NonKeyComponent[CustomerType,]
-        Sell=1
-        for (i in 1:NumComponentType){
-          if (Inventory[i] - KeyOrder[i] < 0){
-            Sell=0 
-          }
-          if (Inventory[i] - NonKeyOrder[i] < 0) {
-            NonKeyOrder[i] = Inventory[i]
-          }
-        }
-        if (Sell==1){
-          Inventory = Inventory - KeyOrder - NonKeyOrder
-          if (Clock>WarmUp){
-            TotalProfit = TotalProfit + sum(Profit*(KeyOrder + NonKeyOrder))
-          }
-        }
-        
-        EventTime[1]=Clock-log(runif(1))/ArrivalRate
-        if (Sell==1){
-          for (i in 1:NumComponentType){
-            if (Inventory[i]<BaseStockLevel[i]  && EventTime[i+1]>1e4){
-              EventTime[i+1] = Clock + max(0,ProTimeMean[i]+rnorm(1)*ProTimeStd[i])
-            }
-          }
-        }
-      }else{ # stock has arrived
-        ComponentType = event-1;
-        Inventory[ComponentType] = Inventory[ComponentType]+1
-        if (Inventory[ComponentType]>=BaseStockLevel[ComponentType]){
-          EventTime[event]=1e5
-          if (Clock>WarmUp){
-            TotalCost=TotalCost+(Clock-OldClock)* sum(OldInventory*HoldingCost)
-          }
-        }
-      }
-    }
-    fn = (TotalProfit-TotalCost)/(TotalTime-WarmUp);
-    fnSum = fnSum + fn;
-  }
-  
-  fnAvg = fnSum / runlength
-  
-  return(fnAvg)
-}
-
-RunATO = function(BaseStockLevel=rep(1,8), seed=1, runlength=5){
-
-  # Args:
-  #   BaseStockLEvel: target stock quantities for each product
-  #   runlength: integer, repetitions of the simulation
-  #   seed: integer, to force deterministic simulation
-  #
-  # Returns:
-  #   fnAvg: Average profit over runlength reps of simulation
-  
-  NumComponentType=8;               #% number of component types
-  
-  ProTimeMean = c(0.15, 0.4, 0.25, 0.15, 0.25, 0.08, 0.13, 0.4)
-  ProTimeStd = 0.15*ProTimeMean
-  Profit = 1:8
-  HoldingCost = matrix(2, 1, NumComponentType)
-  # % holding cost of each component in
-  # % inventory
-  # 
-  # % Parameters of Customers
-  
-  ArrivalRate = 12             #% assume Possion arrival
-  iArrivalRate = 1/ArrivalRate
-  # %NumCustomerType=5;             % number of customer types
-  # %CustomerProb=[0.3,0.25,0.2,0.15,0.1];   % probability of each customer
-  KeyComponent=c(1,0,0,1,0,1,0,0,
-                 1,0,0,0,1,1,0,0,
-                 0,1,0,1,0,1,0,0,
-                 0,0,1,1,0,1,0,0,
-                 0,0,1,0,1,1,0,0)
-  KeyComponent = matrix(KeyComponent, nrow=5, byrow=TRUE)
-  
-  NonKeyComponent=c(0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,1,0,
-                    0,0,0,0,0,0,0,0,
-                    0,0,0,0,0,0,0,1,
-                    0,0,0,0,0,0,1,0)
-  NonKeyComponent = matrix(NonKeyComponent, nrow=5, byrow=TRUE)
-  
-  WarmUp = 20
-  TotalTime = 70
-  
-  #% Simulation
-  fnSum = 0.0
-  set.seed(seed)
-  Customer_series = sample(size=TotalTime*ArrivalRate*runlength*2, 1:5, prob=c(0.3,0.25,0.2,0.15,0.1), replace=T)
-  t = 1
-  
-  for (k in 1:runlength){
-    
-    # runif_preset = runif()
-    
-    EventTime = matrix(1e5, 1, 1+NumComponentType)
-    EventTime[1] = -log(runif(1))*iArrivalRate
-    TotalProfit = 0
-    TotalCost = 0
-    Inventory = BaseStockLevel
-    
-    Clock = 0
-    
-    while (Clock<TotalTime){
-      OldInventory = Inventory
-      OldClock = Clock
-      Clock = min(EventTime)
-      event = which.min(EventTime)
-      if (event==1){ # a customer has come!
-        # Reset clock
-        EventTime[1]=Clock-log(runif(1))*iArrivalRate
-        
-        # Get new customer
-        CustomerType = Customer_series[t]
-        t=t+1
-        
-        KeyOrder = KeyComponent[CustomerType,]
-        NonKeyOrder = NonKeyComponent[CustomerType,]
-        
-        Sell = all(Inventory>=KeyOrder)
-        NonKeyOrder = Inventory * (Inventory<=NonKeyOrder) + NonKeyOrder*(Inventory>NonKeyOrder)
-        
-        if (Sell){
-          Inventory = Inventory - KeyOrder - NonKeyOrder
-          if (Clock>WarmUp){ TotalProfit = TotalProfit + sum(Profit*(KeyOrder + NonKeyOrder)) }
-          
-          for (i in 1:NumComponentType){
-            if (Inventory[i]<BaseStockLevel[i]  && EventTime[i+1]>1e4){
-              EventTime[i+1] = Clock + max(0,ProTimeMean[i]+rnorm(1)*ProTimeStd[i])
-            }
-          }
-          # reset = ((Inventory<BaseStockLevel)  & (EventTime[-1]>1e4))
-          # new_times = rnorm(sum(reset), ProTimeMean[reset], ProTimeStd[reset])
-          # EventTime[-1][reset] = Clock + new_times*(new_times>0) #max(0,ProTimeMean[i]+rnorm(1)*ProTimeStd[i])
-        }
-        
-        
-      }else{ # stock has arrived
-        ComponentType = event-1;
-        Inventory[ComponentType] = Inventory[ComponentType]+1
-        if (Inventory[ComponentType]>=BaseStockLevel[ComponentType]){
-          EventTime[event]=1e5
-          if (Clock>WarmUp){ TotalCost=TotalCost+(Clock-OldClock)* sum(OldInventory*HoldingCost) }
-        }
-      }
-    }
-    fn = (TotalProfit-TotalCost)/(TotalTime-WarmUp);
-    fnSum = fnSum + fn;
-  }
-  
-  fnAvg = fnSum / runlength
-  
-  return(fnAvg)
-}
-
-old_Build_ATO_TestFun = function(seed, numtestseeds=50){
-  trainseed = seed*10000 + numtestseeds
-  testseeds = seed*10000 + 1:numtestseeds
-  
-  
-  
-  TestFun_i = function(xs){
-    # the "TruePerf" is when seed=0
-    if(xs[9]==0){
-      Test_outputs = sapply(testseeds, function(si)RunATO(xs[1:8], seed=si))
-      return(mean(Test_outputs))
-      
-    } else if (xs[9]>0){
-      return( RunATO(xs[1:8], seed=trainseed+xs[9]) )
-    }
-  }
-  
-  TestFun = function(xs){
-    xs = Check_X(xs, 8, T, "ATO TestFun")
-    apply(xs, 1, TestFun_i)
-  }
-  
-  return(TestFun)
-}
-
-Build_Xie_ATO_Testfun = function(seed=1, numtestseeds=50, runlength=5){
+Build_Xie_ATO_Testfun = function(seed=1, numtestseeds=2000, runlength=1){
   
   trainseed = seed*10000 + numtestseeds
   testseeds = seed*10000 + 1:numtestseeds
@@ -528,86 +244,24 @@ Build_Xie_ATO_Testfun = function(seed=1, numtestseeds=50, runlength=5){
   
 }
 
-Build_Xie_ATO_cpp_Testfun_old = function(baseseed=1, numtestseeds=200, runlength=5){
-  Rcpp::sourceCpp('TestFuns/ATO.cpp')
-  items = c(  1,      2,      .15,   .0225,   20,
-              2,      2,      .40,    .06,    20,
-              3,      2,      .25,    .0375,  20,
-              4,      2,      .15,    .0225,  20,
-              5,      2,      .25,    .0375,  20,
-              6,      2,      .08,    .012,   20,
-              7,      2,      .13,    .0195,  20,
-              8,      2,      .40,    .06,    20)
-  items = matrix(items, 8, 5, byrow=T)
+Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1){
+  # The ATO simulator, this is a port of the Matlab code from:
+  #
+  #   http://simopt.org/wiki/index.php?title=Assemble_to_order 
+  #
+  # The for loops of the simulator are written in R-c++ for speed. The
+  # RNG streams for testing are also pre-generated and cached for speed.
+  #
+  # ARGUMENTS:
+  #   baseseed: int, with simulator args (x,s) all rng stream uses baseseed + s, 
+  #   numtestseeds: int, how many evaluations/seeds to use at test time.
+  #   runlength: int: number of repeated simualtion runs to average over.
+  #
+  # RETURNS:
+  #   TestFun: callable fun(x,s) -> R, profit using stock level x with rng stream s
+  #   Get_RV: callable fun(), returns rng streams used for testing
+  #   get_simcalls: callable fun(): returns number of calls made to simulator
   
-  products = c( 3.6,    1,  0,  0,  1,  0,  1,  1,  0,
-                3,      1,  0,  0,  0,  1,  1,  1,  0,
-                2.4,    0,  1,  0,  1,  0,  1,  0,  0,
-                1.8,    0,  0,  1,  1,  0,  1,  0,  1,
-                1.2,    0,  0,  1,  0,  1,  1,  1,  0)
-  products  = matrix(products, 5, 9, byrow=T)
-  Tmax      = 70
-  nProducts = 5
-  nGen      = 10*Tmax*round(sum(products[,1]))
-  
-  Make_Stream = function(s, runlength, baseseed){
-    cat("calling makestream\n")
-    set.seed(1000*baseseed+s)
-    Arrival = array(0, dim=c(runlength, nProducts, nGen))
-    for (k in 1:nProducts) Arrival[,k,]= -log(runif(nGen*runlength))*(1/products[k,1]) 
-    
-    ProdTimeKey= matrix(rnorm(nGen*runlength), runlength, nGen)
-    ProdTimeNonKey= matrix(rnorm(nGen*runlength), runlength, nGen)
-    
-    list(Arrival=Arrival, ProdTimeKey=ProdTimeKey, ProdTimeNonKey=ProdTimeNonKey, runlength=runlength)
-  }
-  
-  RV = lapply(1:10001, function(a)NULL)
-  RV[[1]] = Make_Stream(0, numtestseeds*runlength, baseseed)
-  
-  simcalls = 0
-  
-  TestFun_i = function(xs){
-    
-    ss = xs[9]+1
-    # Generate new RNG streams
-    # if(length(RV)< ss){
-    #   RV[[ss]] <<- Make_Stream(ss, runlength, baseseed)
-    # }else 
-    if(is.null(RV[[ss]])){
-      cat(ss, is.null(RV[[ss]]), "\n")
-      RV[[ss]] <<- Make_Stream(ss, runlength, baseseed)
-      # RV <<- RV
-    }
-    
-    out = sapply(1:RV[[ss]]$runlength, function(k){
-      simcalls <<- simcalls+1
-      Simulate_ATO(
-        xs[1:8], 
-        RV[[ss]]$Arrival[k,,], 
-        RV[[ss]]$ProdTimeKey[k,], 
-        RV[[ss]]$ProdTimeNonKey[k,], 
-        items, 
-        products)})
-    return(mean(out))
-  }
-  
-  TestFun = function(xs){
-    xs = Check_X(xs, 8, T, "ATO cpp")
-    out = 1:nrow(xs)
-    for(i in 1:nrow(xs))out[i] = TestFun_i(xs[i,])
-    # cat("\n",length(RV))
-    out
-  }
-  
-  Get_RV = function() RV
-  
-  Get_simcalls = function()simcalls
-  
-  c(TestFun, Get_RV, Get_simcalls)
-}
-
-Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=500, runlength=5){
   Rcpp::sourceCpp('TestFuns/ATO.cpp')
   items = c(  1,      2,      .15,   .0225,   20,
               2,      2,      .40,    .06,    20,
@@ -690,59 +344,7 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=500, runlength=5){
   # TestFun
 }
 
-Build_Matlab_ATO = function(BOseed, numtestseeds=100, runlength1=5, HN1=F){
-  
-  # stop("gotta do some sanity checking to see this works as expected!")
-  BaseSeed = 10000*BOseed
-  
-  Matlab_ATO = function(x, runlength, path_to_ATO_batch="/home/maths/phrnaj/ATO", HN=HN1){
-    
-    folder = getwd()
-    if(is.null(dim(x))&length(x)==9) x = matrix(x,1)
-    
-    out_fname = tempfile(fileext = ".txt")
-    mat_fname = tempfile(fileext = ".m")
-    
-    row_str = sapply(1:nrow(x), function(a)paste(x[a,],collapse=","))
-    mat_str = paste(row_str, collapse="; ")
-    
-    runl_str = paste(runlength, collapse=",")
-    
-    if(HN){
-      code = paste( "cd('",path_to_ATO_batch,"'); \np=ATOHongNelson_batch([", mat_str, "],[",runl_str,"]); \nsave('",out_fname,"','p','-ascii')", sep="")
-    }else{
-      code = paste( "cd('",path_to_ATO_batch,"'); \np=ATO_batch([", mat_str, "],[",runl_str,"]); \nsave('",out_fname,"','p','-ascii')", sep="")
-    }
-    write(code, mat_fname)
-    
-    exec1 = "matlab  -nojvm -nodesktop -nosplash -nodisplay -r  \"try, run('"
-    exec2 = "'); catch err, disp(err.message); exit(1); end; exit(0);\""
-    full_exec = paste(exec1, mat_fname, exec2, sep="")
-    
-    cat("calling MATLAB...")
-    system(full_exec, wait=T, ignore.stdout=T)
-    cat("done, ")
-    as.numeric(readLines(out_fname))
-  }
-  
-  TestFun = function(x){
-    x = Check_X(x,8,T,"matlab ATO")
-    
-    runl = (1 + (x[,9]==0)*(numtestseeds-1)) * runlength1
-    
-    x[,9] = x[,9] + BaseSeed
-    
-    output = Matlab_ATO(x, runl)
-    
-    return(output)
-    
-  }
-  
-  return(TestFun)
-  
-}
-
-Build_ATO_TestFun = function(seed, numtestseeds=50, runlength=5){
+Build_ATO_TestFun = function(seed, numtestseeds=2000, runlength=1){
   
   trainseed = seed*10000 + numtestseeds
   testseeds = seed*10000 + 1:numtestseeds
@@ -885,40 +487,40 @@ Build_ATO_TestFun = function(seed, numtestseeds=50, runlength=5){
   
 }
 
-Build_GP_TestFun = function(seed, dims, TPars){
-  # Args:
-  #   seed: the fixed random number generator seed
-  #   dims: dimension of decision variable
-  #   TPars: 5 hyperparams, dims*L_theta, S_theta, dims*L_eps, S_eps, C_eps
+
+
+#############################################################
+#                                                           #
+#                  Ambualnces in a Square Simulator         #
+#                                                           #
+#############################################################
+
+Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=1, NumCalls = 30){
+  # The Ambulances in a square simulator, this is a port of the Matlab code from:
   #
-  # Returns:
-  #   TestFun: a function that takes continuous input and a seed, returns scalar
+  #   http://simopt.org/wiki/index.php?title=Ambulances_in_a_square 
+  #
+  # The for loops of the simulator are written in R-c++ for speed. The
+  # RNG streams for testing are also pre-generated and cached for speed.
+  #
+  # ARGUMENTS:
+  #   baseseed: int, with simulator args (x,s) all rng stream uses baseseed + s, 
+  #   numtestseeds: int, how many evaluations/seeds to use at test time.
+  #   runlength: int: number of repeated simualtion runs to average over.
+  #   NumCalls: how many patients to generate within the simulator.
+  #
+  # RETURNS:
+  #   TestFun: callable fun(x,s) -> R, profit using stock level x with rng stream s
+  #   Get_RV: callable fun(), returns rng streams used for testing
+  #   get_simcalls: callable fun(): returns number of calls made to simulator
   
-  ThetaFuns    = GenFun(LX=rep(TPars[1],dims), SS2=TPars[2], SC2=0, seed=1000*seed)
-  Theta        = ThetaFuns$fun
-  EPS          = lapply(1:500, function(i)GenFun(LX = rep(TPars[3], dims), SS2 = TPars[4], SC2=TPars[5], seed = seed*1000+i)$fun)
-  
-  DD = 1:dims
-  SS = dims+1
-  
-  TestFun_i = function(xsi) Theta(xsi[DD]) + if(xsi[SS]>0&xsi[SS]<=length(EPS)) EPS[[xsi[SS]]](xsi[DD]) else 0
-  
-  TestFun  = function(xs){
-    xs = Check_X(xs, dims, T, "GP TestFun")
-    apply(xs, 1, TestFun_i)
-  }
-  
-  return(list(fun=TestFun, grad=ThetaFuns$dfun))
-}
-
-########################################################################################################
-# Ambulance
-
-Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, NumCalls = 30){
+  # compile the cpp
   Rcpp::sourceCpp('TestFuns/Ambulances.cpp')
   cat(" Ambulances.cpp compilation complete. ")
   
   simcalls = 0 
+  
+  # function to generate rng stream to be passed ot the simulator.
   Make_Stream = function(s, runlength, baseseed){
     # cat("calling makestream\n")
     set.seed(10000*baseseed+s)
@@ -944,14 +546,17 @@ Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, 
     
   }
   
+  # generate and cache streams for testing
   TestStreams = Make_Stream(0, numtestseeds*runlength, baseseed)
   
+  # the callable function for a single imput.
   TestFun_i = function(xs){
     
     if(xs[7]==0){
+      # s=0, use test rng streams.
       RV = TestStreams
     }else{
-      # Generate new RNG streams
+      # s > 0, generate new RNG stream
       RV = Make_Stream(xs[7], runlength, baseseed)
     }
     
@@ -965,6 +570,7 @@ Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, 
     return(-mean(out))
   }
   
+  # vectorisation wrapper for testfun.
   TestFun = function(xs){
     cat("\nRunning Ambulance sim...")
     if (is.null(dim(xs)))xs = matrix(xs, 1)
@@ -979,6 +585,7 @@ Build_Ambulance_Testfun = function(baseseed=1, numtestseeds=10000, runlength=5, 
   
   Get_simcalls = function()simcalls
   
+  # save the name of the funciton and its range as attributes.
   attr(TestFun, 'ran') = rbind(rep(0,6), rep(20,6))
   attr(TestFun, 'name') = "Ambulances"
   
@@ -1067,8 +674,75 @@ Build_DailyAmbulance_Testfun = function(baseseed=1, numtestseeds=10000, runlengt
   # TestFun
 }
 
-########################################################################################################
-# GP
+
+
+#############################################################
+#                                                           #
+#             Gaussian Process Test Functions               #
+#                                                           #
+#############################################################
+
+
+LHCdim = function(N0, dims){
+  # Contstructs a rough latin hyptercube randomly sampled points.
+  # Output are N0 points in [0,1]^dims space.
+  # Args
+  #   N0: int, the number of points to generate
+  #   dims: int, the box for scaling+centring samples
+  #   
+  # Returns
+  #   (N0, dims) matrix, random LHC of N0 points in [0,1]^dims
+  
+  sapply(1:dims, function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
+}
+
+LHCran = function(N0, ran){
+  # contructs rough latin hypercube in box with bounds given by ran.
+  # Args
+  #   N0: int, the number of points to generate
+  #   ran: (2, dims) matrix, the lower and upper bounds for LHC samples.
+  #   
+  # Returns
+  #   (N0, dims) matrix, a randomly generated LHC of N0 points in ranges ran
+  
+  if(length(ran)==2)ran=matrix(ran,ncol=1)
+  
+  if (any(ran[1,]>=ran[2,])|nrow(ran)!=2) stop("LHC bounds are not valid: ", paste(bottoms, tops, collapse=", "))
+  
+  dims = ncol(ran)
+  LHC1 = sapply(1:dims,function(d){  (sample(1:N0) - runif(N0))  })*(1/N0)
+  
+  BB = matrix(ran[1,], N0, length(ran[1,]), byrow=T)
+  CC = matrix(ran[2,]-ran[1,], N0, length(ran[1,]), byrow=T)
+  
+  BB + LHC1*CC
+}
+
+Build_GP_TestFun = function(seed, dims, TPars){
+  # Args:
+  #   seed: the fixed random number generator seed
+  #   dims: dimension of decision variable
+  #   TPars: 5 hyperparams, dims*L_theta, S_theta, dims*L_eps, S_eps, C_eps
+  #
+  # Returns:
+  #   TestFun: a function that takes continuous input and a seed, returns scalar
+  
+  ThetaFuns    = GenFun(LX=rep(TPars[1],dims), SS2=TPars[2], SC2=0, seed=1000*seed)
+  Theta        = ThetaFuns$fun
+  EPS          = lapply(1:500, function(i)GenFun(LX = rep(TPars[3], dims), SS2 = TPars[4], SC2=TPars[5], seed = seed*1000+i)$fun)
+  
+  DD = 1:dims
+  SS = dims+1
+  
+  TestFun_i = function(xsi) Theta(xsi[DD]) + if(xsi[SS]>0&xsi[SS]<=length(EPS)) EPS[[xsi[SS]]](xsi[DD]) else 0
+  
+  TestFun  = function(xs){
+    xs = Check_X(xs, dims, T, "GP TestFun")
+    apply(xs, 1, TestFun_i)
+  }
+  
+  return(list(fun=TestFun, grad=ThetaFuns$dfun))
+}
 
 GenFun = function(seed=NULL, LX=20, SS2=25, SC2=100, Nx=NULL){
   # Create a single continuous GP test function  
