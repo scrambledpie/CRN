@@ -310,7 +310,7 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1)
       RV = Make_Stream(xs[9], runlength, baseseed)
     }
     
-    out = sapply(1:RV$runlength, function(k){
+    out = sapply(1:10, function(k){
       simcalls <<- simcalls+1
       Simulate_ATO(
         xs[1:8], 
@@ -319,7 +319,8 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1)
         RV$ProdTimeNonKey[[k]], 
         items, 
         products)})
-    return(mean(out))
+    print(out)
+    return(out)
   }
   
   TestFun = function(xs){
@@ -340,7 +341,7 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1)
   attr(TestFun, 'name') = "ATO"
   
   
-  c(TestFun, Get_RV, Get_simcalls)
+  c(TestFun_i, Get_RV, Get_simcalls)
   # TestFun
 }
 
