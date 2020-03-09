@@ -20,41 +20,51 @@ OptimizerBase = R6Class("OptBase",
 )
 
 
-Kernel_regression = function(X_test, X_train, Y_train, r){
-    # Makes predictions of output at X_train
+Kernel_regression = function(X_test, X_train, Y_train, r, lb, ub){
+    # Makes predictions of output at X_test using top-hat kernel
+    #
+    # ARGS:
+    #  X_test: (n_test, dims) matrix
+    #  X_train: (n_train, dims) matrix
+    #  Y_train: (n_train) vector
+    #  r: radius of kernel in units of domain width
+    #  lb: (dims) lower bounds on X
+    #  ub: (dims) upper bounds on X
+    #
+    # RETURNS:
+    #  pred: (n_test) vector
 
     dims = ncol(X_train)
     n_test = nrow(X_test)
+    n_train = nrow(X_train)
 
-    diffs_sq = lapply(1:dims, function(i)outer(X_test[ ,i], X_train[ ,i], "-")^2)
+    invlx_sq = 1/(ub - lb)^2
+
+    diffs_sq = lapply(1:dims, function(i)outer(X_test[ ,i], X_train[ ,i], "-")^2 * invlx_sq[i])
 
     x_sq = Reduce("+", diffs_sq)
 
     r_sq = r * r
 
-    pred = rep(0, n_test)
+    mask_mat = 1 * (x_sq < r_sq)
 
-    for(i in 1:n_test){
+    Y_train_mat = matrix(Y_train, n_test, n_train, byrow=T)
 
-        mask_i = x_sq[i, ] < r_sq
-        pred[i] = mean( Y_train[mask_i] )
-
-    }
+    pred = apply( mask_mat * Y_train_mat, 2, mean)
 
     return(pred)
-
 }
 
 
-Build_pred_model = function(X_train, Y_train, r_series)
+# Build_pred_model = function(X_train, Y_train, r_series)
 
 
 
-X = matrix(1:10, ncol=1)
+X <- matrix(1:10, ncol=1)
 Y = rnorm(10)
 
 X_test = matrix(seq(0, 10, len=100), ncol=1)
-Y_pred = Kernel_regression(X_test, X, Y, 0.2)
+Y_pred = Kernel_regression(X_test, X, Y, r=0.2, lb=0, ub = 10)
 
 
 
