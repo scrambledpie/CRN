@@ -23,13 +23,15 @@ ran = attr(TestFun, 'ran') # bounds of the search space.
 
 # pick the optimizer from the list
 source('CRN_BO/Optimizers.R')
+source('CRN_BO/SOSA.R')
 ALGORITHMS = c(BO_KG,                   # normal Knowledge Gradient (KG)
                BO_CRNKG_CS,             # KG-CRN with compound spheric noise model
                BO_PWKG_CS,              # KG-PW with compound spheric noise model
                BO_CRNKG_CSW,            # KG-CRN with full noise model: compound spheric + wiggles
                BO_PWKG_CSW,             # PW-KG with full noise model
                BO_CRNKG_CS_allseeds,    # KG-CRN with CS model, acq fun is optimized for each seed (slow)
-               BO_CRNKG_CSW_allseeds)   # KG-CRN with full model, acq fun is optimized for each seed (slow)
+               BO_CRNKG_CSW_allseeds,   # KG-CRN with full model, acq fun is optimized for each seed (slow)
+               BO_CRNKG_CSW_allseeds)   # SOSA, the algrotihms proposed by 
 
 Optim_class = ALGORITHMS[[method]]
 

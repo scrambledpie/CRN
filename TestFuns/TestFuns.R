@@ -302,7 +302,7 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1)
   simcalls = 0
   
   TestFun_i = function(xs){
-    
+    print(xs)
     if(xs[9]==0){
       RV = TestStreams
     }else{
@@ -310,7 +310,7 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1)
       RV = Make_Stream(xs[9], runlength, baseseed)
     }
     
-    out = sapply(1:10, function(k){
+    out = sapply(1:RV$runlength, function(k){
       simcalls <<- simcalls+1
       Simulate_ATO(
         xs[1:8], 
@@ -319,16 +319,22 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1)
         RV$ProdTimeNonKey[[k]], 
         items, 
         products)})
-    print(out)
-    return(out)
+
+    # print(out)
+    return(mean(out))
   }
   
   TestFun = function(xs){
+
     cat("\nRunning ATO sim...")
-    if (is.null(dim(xs)))xs=matrix(xs,1)
+
+    # sanity check input
+    if (is.null(dim(xs)))xs=matrix(xs, nrow=1)
     xs = Check_X(xs, 8, T, "ATO cpp")
-    out = 1:nrow(xs)
-    for(i in 1:nrow(xs))out[i] = TestFun_i(xs[i,])
+
+    # simulate for each row/input
+    out = apply(xs, 1, TestFun_i)
+
     cat("done, ")
     out
   }
@@ -339,9 +345,9 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1)
   
   attr(TestFun, 'ran') = rbind(rep(0,8), rep(20,8))
   attr(TestFun, 'name') = "ATO"
+
   
-  
-  c(TestFun_i, Get_RV, Get_simcalls)
+  c(TestFun, Get_RV, Get_simcalls)
   # TestFun
 }
 

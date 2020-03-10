@@ -1,24 +1,5 @@
 library(R6)
 
-######################################################################
-# A generic parent class for any optimizer to be used
-OptimizerBase = R6Class("OptBase",
-  public=list(
-    TestFun    = NULL,
-    ran        = NULL,
-    X_domain   = NULL,
-    RecX       = list(),
-    Cost       = data.frame(N=numeric(0), P=numeric(0)),
-    rounding   = FALSE,
-    initialize = function(TestFun, ran, rounding=F, X_domain=NULL){
-      self$TestFun = TestFun
-      self$ran = ran
-      self$rounding = rounding
-      self$X_domain = X_domain
-    }
-  )
-)
-
 
 Kernel_regression = function(X_test, X_train, Y_train, r, lb, ub){
     # Makes predictions of output at X_test using top-hat kernel
@@ -158,6 +139,10 @@ shrinking_ball_regression = function(X_test, X_train, Y_train, r_series, lb, ub)
     # RETURNS:
     #  pred: (n_test) vector
 
+    stopifnot(
+      length(dim(X_train))==2
+    )
+
     dims = ncol(X_train)
     n_test = nrow(X_test)
     n_train = nrow(X_train)
@@ -192,10 +177,12 @@ shrinking_ball_regression = function(X_test, X_train, Y_train, r_series, lb, ub)
 
     ball_counts = apply(mask_mat, 1, sum)
 
+    # model is not defined for x outside of the balls!
+    stopifnot(all(ball_counts>0))
+
     # (n_test)
     pred = apply( mask_mat * Y_train_mat, 1, sum) / ball_counts
 
-    pred[ball_counts==0] = 0
 
     return(pred)
 }
@@ -277,7 +264,7 @@ improved_hit_and_run = function(centre, lb, ub){
 
 }
 
-if (1==1){
+if (1==11){
   #############################################
   # TESTING IMPROVED HIT AND RUN SAMPLER
   pdf("mygraphic.pdf")
@@ -288,14 +275,22 @@ if (1==1){
 
   plot(c(-1.5, 2.5), c(-1.5, 2.5), col="white")
   lines(c(0, 0, 1, 1, 0), c(0, 1, 1, 0, 0))
+
+  a_full = centre
   for( i in 1:1000){
     a = improved_hit_and_run(centre, lb, ub)
     points(a[1], a[2], col='red', pch=4)
+
+    a_full = rbind(a_full, a)
   }
 
   points(centre[1], centre[2], pch=19, col="brown")
   dev.off()
-  system("open -a Preview mygraphic.pdf")
+  browseURL("mygraphic.pdf")
+  # system("open -a Preview mygraphic.pdf")
+
+  print(max(a_full))
+  print(min(a_full))
 
 }
 
@@ -304,29 +299,37 @@ if (1==1){
 
 ######################################################################
 # A generic BO base class to be inherited by all BO methods
-SOSA = R6Class("SOSA",inherit = OptimizerBase,
+SOSA = R6Class("SOSA",
   public=list(
+    TestFun    = NULL,
+    ran        = NULL,
+    lb         = NULL,
+    ub         = NULL,
+    RecX       = list(),
+    Cost       = data.frame(N=numeric(0), P=numeric(0), slowP=numeric(0)),
+    rounding   = FALSE,
     Timing = list(),
     myID   = NULL,
     BOseed = NULL,
     method = NULL,
-    Ns0    = NULL,
     r0     = NULL,
     gamma  = NULL,
     beta   = NULL,
     s      = NULL,
     r_series = NULL,
     i_n_series = NULL,
+    X      = NULL,
+    Y      = NULL,
+    Y_pred = NULL,
 
     initialize = function(testfun, 
-                          ran, 
+                          ran,
                           BOseed=NULL, 
                           myID=NULL, 
-                          Ns0=5,
                           rounding=F,
-                          r0=100,
+                          r0=0.05,
                           gamma=0.9,
-                          beta=0.9,
+                          beta=0.009,
                           s=0.9
                           ){
       # ARGS:
@@ -334,27 +337,27 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
       #   ran: (2, dims) matrix, lower and upper bounds
       #   BOseed: fixed RNG seed
       #   myID: number to use as savefile
-      #   Ns0: number of starting points
       #   rounding: bool, stick to integers
       #   r0: initial radius of ball
       #   gamma: order of local sample density
       #   beta: radius decay exponent
       #   s: recomendation time sequence shrinkage
 
-      super$initialize(testfun, ran, rounding)
+      self$TestFun = TestFun
+      self$ran = ran
+      self$rounding = rounding
       self$lb = self$ran[1, ]
       self$ub = self$ran[2, ]
-      self$Ns0     = Ns0
       self$BOseed  = BOseed
       self$myID    = myID
       set.seed(BOseed)
 
       self$r0 = r0
-      self$r_series = r0 ^ (0:2000)
-      self$gamma = gamma
       self$beta = beta
-      self$s = s,
-      self$i_n_series = floor( 1:n ^ s )
+      self$r_series = r0 * ((0:2000) ^ -beta)
+      self$gamma = gamma
+      self$s = s
+      self$i_n_series = floor( 0:2000 ^ s )
     },
 
     get_RecX = function(){
@@ -362,67 +365,84 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
 
       # if necessary, update the predicted function values
       self$update_pred_Y()
+      dims = ncol(self$X) - 1
 
       # best of all observed X
-      rec_X_i = which.max(Y_pred)
-      best_X = self$X[rec_X_i,]
+      rec_X_i = which.max(self$Y_pred)
+      best_X = self$X[rec_X_i, 1:dims]
 
       # best of observed x upto time i_n
       n = length(self$Y)
       i_n = self$i_n_series[n]
-      slow_Y_pred = Y_pred[1:i_n]
+      slow_Y_pred = self$Y_pred[1:i_n]
       slow_rec_X_i = which.max(slow_Y_pred)
-      slow_best_X = self$X[slow_rec_X_i,]
+      slow_best_X = self$X[slow_rec_X_i, 1:dims]
 
-      return(list(best_x=best_x, slow_best_x=slow_best_x))
+      return(list(best_x=best_X, slow_best_x=slow_best_X))
     },
 
     get_next_x = function(){
+      # Acquisition method: hit and rtun centred 
+      # on the predicted peak.
+      dims = ncol(self$X) - 1
 
-      # if necessary, update the predicted function values
+      # if necessary, update the predicted function values.
       self$update_pred_Y()
 
-      # best of all observed X
-      rec_X_i = which.max(Y_pred)
-      best_X = self$X[rec_X_i,]
+      # best of all observed X is the centre of sampler.
+      rec_X_i = which.max(self$Y_pred)
+      best_X = self$X[rec_X_i, 1:dims]
 
       new_x = improved_hit_and_run(best_X, self$lb, self$ub)
+
+      # add the seed on
+      new_x = c(new_x, length(self$Y))
 
       return(new_x)
     },
 
     UpdateLogs = function(KG_time=0, eval_time=0, fit_time=0){
-      N = length(self$GP$yd)
+
+      N = length(self$Y)
       
       self$Timing[[N]] = c(KG_time, eval_time, fit_time)
-      
       self$RecX[[N]]   = self$get_RecX()
       
-      Rx_best               = matrix(c(self$RecX[[N]]$best_X, 0), nrow=1)
-      Rx_slow               = matrix(c(self$RecX[[N]]$slow_best_X, 0), nrow=1)
-      NCi                   = nrow(self$Cost)+1
+      Rx_best               = matrix(c(self$RecX[[N]]$best_x, 0), nrow=1)
+      Rx_slow               = matrix(c(self$RecX[[N]]$slow_best_x, 0), nrow=1)
+      NCi                   = nrow(self$Cost) + 1
+
+      # cat("Rx_best: ", Rx_best, ",  Rx_slow: ", Rx_slow, "\n")
+
       self$Cost[NCi,]  = c(N, self$TestFun(Rx_best), self$TestFun(Rx_slow))
     },
 
     update_pred_Y = function(){
+
+      stopifnot( length(dim(self$X))==2 )
+
       if(length(self$Y_pred)!= length(self$Y)){
-        self$Y_pred = shrinking_ball_regression(self$X, self$X, self$Y, self$r_series, self$lb, self$ub)
+        dims = ncol(self$X) - 1
+        X_train = self$X[ , 1:dims, drop=F]
+
+
+        print(dim(X_train))
+        self$Y_pred = shrinking_ball_regression(X_train, X_train, self$Y, self$r_series, self$lb, self$ub)
       }
     },
 
-    base_optimize = function(Budget0=20, Budget=500, get_next_x=NULL, learn_kernel=NULL, Ns0=5){
+    optimize = function(Budget=500, ...){
       
       
-      if(is.null(get_next_x))stop("provide a get_next_x() function!")
-      
-
       cat("Starting Optimization")
       t0       = proc.time()[3]
       
-      cat("\nSelecting points 1,...,", Budget0, "\n")
 
       # get first initilialization points
+      cat("\nSelecting point 1 \n")
       X_init = ( self$ran[1, ] + self$ran[2, ] ) * 0.5
+      if(self$rounding) X_init = round(X_init)
+      X_init = matrix(c(X_init, 1), nrow=1) # append the seed
       KG_time = proc.time()[3] - t0
       
       # get objective function values
@@ -435,43 +455,66 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
       self$update_pred_Y()
       fit_time = proc.time()[3] - t0 - KG_time - eval_time
       
+      # synchronise status
       self$UpdateLogs(KG_time, eval_time, fit_time)
       
-      RX = signif(tail(self$RecX,1)[[1]], 3)
-      cat("Logs updated, RecX:", RX,", performance:", as.numeric(tail(self$Cost,1)), "\n\n\n")
-        
-
       # Now do the sequential bit!
       while (length(self$Y)<Budget){
 
         N =  length(self$Y)+1
+        
         cat("Selecting point: ",N, "\n")
         t0 = proc.time()[3]
         
         # Get the new x to evaluate
-        newx = get_next_x()
-        if(self$rounding) newx = round(newx)
+        new_x = self$get_next_x()
+        if(self$rounding) new_x = round(new_x)
+
+        cat("new x is: ", new_x, "\n")
         KG_time = proc.time()[3] - t0
         
         
         # Evaluate the objective function
-        newy = self$TestFun(newx)
+        new_y = self$TestFun(new_x)
         eval_time = proc.time()[3] - t0 - KG_time
         
         
         # Update the data and either do a full hpar update or just finetune
-        self$X      = rbind(self$X, newx)
-        self$Y      = c(self$Y, newy)
-        fit_time        = proc.time()[3] - t0 - eval_time - KG_time
+        self$X      = rbind(self$X, new_x)
+        self$Y      = c(self$Y, new_y)
+        fit_time    = proc.time()[3] - t0 - eval_time - KG_time
         
         self$UpdateLogs(KG_time, eval_time, fit_time)
         
-        self$Checkpoint()
-        
-        RX = signif(tail(self$RecX,1)[[1]], 3)
-        cat("Logs updated, RecX:", RX,", performance:", as.numeric(tail(self$Cost,1)), "\n\n\n")
       }
       
     }
   )
 )
+
+
+
+
+if(1==1){
+  # RUNNING ON ATO FOR TESTING
+  problem  = 1
+  BOseed   = 1
+  Budget   = 25
+  filename = "debug_SOSA" # where to save results
+
+  # Make the TestFunction
+  source('TestFuns/TestFuns.R')
+  TESTFUNS = c(Build_Xie_ATO_cpp_Testfun,
+               Build_Ambulance_Testfun,
+               Build_DailyAmbulance_Testfun)
+
+  TestFun = TESTFUNS[[problem]](BOseed, numtestseeds=2000, runlength=1)[[1]]
+  ran = attr(TestFun, 'ran') # bounds of the search space.
+
+  print(ran)
+
+  # pick the optimizer from the list
+  Optimizer = SOSA$new(TestFun, ran, BOseed, myID=filename, rounding=T)
+
+  Optimizer$optimize(Budget=Budget)
+}
