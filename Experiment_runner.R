@@ -31,7 +31,7 @@ ALGORITHMS = c(BO_KG,                   # normal Knowledge Gradient (KG)
                BO_PWKG_CSW,             # PW-KG with full noise model
                BO_CRNKG_CS_allseeds,    # KG-CRN with CS model, acq fun is optimized for each seed (slow)
                BO_CRNKG_CSW_allseeds,   # KG-CRN with full model, acq fun is optimized for each seed (slow)
-               BO_CRNKG_CSW_allseeds)   # SOSA, the algrotihms proposed by 
+               SOSA)   # SOSA, the algrotihms proposed by 
 
 Optim_class = ALGORITHMS[[method]]
 
