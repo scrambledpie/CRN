@@ -123,7 +123,7 @@ Root_Finding = function(fun, lo, hi, iters=10){
 }
 
 if(1==11){
-
+  # TESTING ROOT FINDER
   fun = function(x) -x ^3 - 2
 
   lo = -2
@@ -143,7 +143,7 @@ if(1==11){
 
 }
 
-pointwise_ball_regression = function(X_test, X_train, Y_train, r_series, lb, ub){
+shrinking_ball_regression = function(X_test, X_train, Y_train, r_series, lb, ub){
     # Makes predictions of output at X_test using top-hat kernel around each point.
     # Each point has a unique radius/kernel width.
     #
@@ -197,97 +197,8 @@ pointwise_ball_regression = function(X_test, X_train, Y_train, r_series, lb, ub)
 
     pred[ball_counts==0] = 0
 
-    
-
     return(pred)
 }
-
-
-Make_random_point = function(centre, lb, ub){
-  # Picks a random point around using hte improved hit and run
-  # method. Pick a random trajectory passing through centre and
-  # a uniform point along the trajectory.
-  # ARGS:
-  #   centre: (dims) vector in the search space
-  #   lb: (dims) vector of lower bounds
-  #   ub: (dims) vector of upper bounds
-  
-  # RETURNS:
-  #   x: (dims) vector
-
-  dims = length(centre)
-
-  stopifnot(
-    length(lb)==dims,
-    length(ub)==dims,
-    all(lb) <= ub
-  )
-
-  # Make a random direction by taking the direction of an isotropic Gaussian
-  dirn = rnorm(dims)
-  dirn = dirn / sqrt(sum(dirn^2))
-  dirn = dirn * (ub - lb)
-
-
-  plot(c(0, 0, 1, 1, 0), c(0, 1, 1, 0, 0), type='l')
-
-  # make trajectory function
-  traj = function(lambda)centre + lambda * dirn
-
-  x_lo = traj(-10)
-  x_hi = traj(10)
-  X_t = cbind(x_lo, x_hi)
-
-  lines(X_t[1,], X_t[2,], lty=2)
-
-  # find feasible range of lambda
-  within_bounds = function(lambda){
-
-    x = traj(lambda)
-
-    outcome = -0.5 + all(x >= lb) & all(x <= ub)
-
-    points(x[1], x[2], col= 0.5 + outcome)
-
-
-    cat("x ", x, "bound ", outcome, "\n")
-    return(outcome)
-
-  } 
-
-  lambda_min = Root_Finding(within_bounds, -1, 0)$lo
-
-  lambda_max = Root_Finding(within_bounds, 0, 1)$hi
-
-  x = runif(1, lambda_min, lambda_max)
-
-  points(x[1], x[2], pch=19, col='red')
-
-  # rejection sample until x is inside the space
-  while(within_bounds(x) < 0){
-    x = runif(1, lambda_min, lambda_max)
-    points(x[1], x[2], pch=19, col='red')
-  }
-
-  print("made a point")
-  return(x)
-
-}
-
-if (1==1){
-  # TESTING IMPROVED HIT AND RUN SAMPLER
-  png("mygraphic.png")
-
-  lb = c(0, 0)
-  ub = c(1, 1)
-  centre = c(0.9, 0.9)
-
-  a = Make_random_point(centre, lb, ub)
-
-  dev.off()
-  browseURL("mygraphic.png")
-}
-
 
 if(1==11){
   # TESTING OF KERNEL REGRESSION
@@ -299,7 +210,7 @@ if(1==11){
   # Y_pred = Kernel_regression(X_test, X, Y, r=0.2, lb=0, ub = 10)
 
   r_series = rep(2, 10) * ( 0.3 ** (0:9) )
-  Y_pred = pointwise_ball_regression(X_test, X, Y, r_series, lb=0, ub = 10)
+  Y_pred = shrinking_ball_regression(X_test, X, Y, r_series, lb=0, ub = 10)
 
 
 
@@ -311,6 +222,84 @@ if(1==11){
   dev.off()
   browseURL("mygraphic.png")
 }
+
+improved_hit_and_run = function(centre, lb, ub){
+  # Picks a random point using the improved hit and run
+  # method. Pick a straight trajectory passing through centre and
+  # with a random direction, pick a uniform point along the trajectory.
+  # ARGS:
+  #   centre: (dims) point in the search space
+  #   lb: (dims) vector of lower bounds
+  #   ub: (dims) vector of upper bounds
+  #
+  # RETURNS:
+  #   x: (dims) point in search space
+
+  dims = length(centre)
+
+  stopifnot(
+    length(lb)==dims,
+    length(ub)==dims,
+    all(lb <= ub)
+  )
+
+  # Make a random direction from an isotropic Gaussian
+  dirn = rnorm(dims)
+  dirn = dirn * sqrt(dims) / sqrt(sum(dirn^2))
+  dirn = dirn * (ub - lb)
+
+  # make trajectory function
+  traj = function(lambda1) (centre + (lambda1 * dirn))
+
+  # indicator function for in/out of search space
+  within_bounds = function(lambda2){
+    stopifnot(length(lambda2)==1)
+    xx = traj(lambda2)
+    outcome = -0.5 + 1 * (all(xx >= lb) & all(xx <= ub) )
+    return(outcome)
+  } 
+
+  # bounds of lambda values, trajectory within space.
+  lambda_min = Root_Finding(within_bounds, -1, 0)$lo
+  lambda_max = Root_Finding(within_bounds, 0, 1)$hi
+
+  lambda_random = runif(1, lambda_min, lambda_max)
+
+  # rejection sample until lambda_random is inside the space.
+  while(within_bounds(lambda_random) < 0){
+    lambda_random = runif(1, lambda_min, lambda_max)
+  }
+
+  # get the corresponding location
+  x = traj(lambda_random)
+
+  return(x)
+
+}
+
+if (1==1){
+  #############################################
+  # TESTING IMPROVED HIT AND RUN SAMPLER
+  pdf("mygraphic.pdf")
+
+  lb = c(0, 0)
+  ub = c(1, 1)
+  centre = runif(2) #c(0.9, 0.9)
+
+  plot(c(-1.5, 2.5), c(-1.5, 2.5), col="white")
+  lines(c(0, 0, 1, 1, 0), c(0, 1, 1, 0, 0))
+  for( i in 1:1000){
+    a = improved_hit_and_run(centre, lb, ub)
+    points(a[1], a[2], col='red', pch=4)
+  }
+
+  points(centre[1], centre[2], pch=19, col="brown")
+  dev.off()
+  system("open -a Preview mygraphic.pdf")
+
+}
+
+
 
 
 ######################################################################
@@ -326,6 +315,9 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
     gamma  = NULL,
     beta   = NULL,
     s      = NULL,
+    r_series = NULL,
+    i_n_series = NULL,
+
     initialize = function(testfun, 
                           ran, 
                           BOseed=NULL, 
@@ -350,40 +342,74 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
       #   s: recomendation time sequence shrinkage
 
       super$initialize(testfun, ran, rounding)
+      self$lb = self$ran[1, ]
+      self$ub = self$ran[2, ]
       self$Ns0     = Ns0
       self$BOseed  = BOseed
       self$myID    = myID
       set.seed(BOseed)
 
       self$r0 = r0
+      self$r_series = r0 ^ (0:2000)
       self$gamma = gamma
       self$beta = beta
-      self$s = s},
+      self$s = s,
+      self$i_n_series = floor( 1:n ^ s )
+    },
 
     get_RecX = function(){
+      # best predicted x in 1,...,n, and best predicted x in 1,..,i_n points
 
-      if(length(self$predictions)==length(self$Y)){
+      # if necessary, update the predicted function values
+      self$update_pred_Y()
 
-      }
+      # best of all observed X
+      rec_X_i = which.max(Y_pred)
+      best_X = self$X[rec_X_i,]
 
+      # best of observed x upto time i_n
+      n = length(self$Y)
+      i_n = self$i_n_series[n]
+      slow_Y_pred = Y_pred[1:i_n]
+      slow_rec_X_i = which.max(slow_Y_pred)
+      slow_best_X = self$X[slow_rec_X_i,]
+
+      return(list(best_x=best_x, slow_best_x=slow_best_x))
     },
-#
+
+    get_next_x = function(){
+
+      # if necessary, update the predicted function values
+      self$update_pred_Y()
+
+      # best of all observed X
+      rec_X_i = which.max(Y_pred)
+      best_X = self$X[rec_X_i,]
+
+      new_x = improved_hit_and_run(best_X, self$lb, self$ub)
+
+      return(new_x)
+    },
+
     UpdateLogs = function(KG_time=0, eval_time=0, fit_time=0){
       N = length(self$GP$yd)
       
       self$Timing[[N]] = c(KG_time, eval_time, fit_time)
       
-      if(length(self$RecX)>0){
-        self$RecX[[N]]   = self$get_RecX()
-      }else{
-        self$RecX[[N]]   = self$get_RecX()
-      }
+      self$RecX[[N]]   = self$get_RecX()
       
-      Rx               = matrix(c(self$RecX[[N]], 0), 1)
-      NCi              = nrow(self$Cost)+1
-      self$Cost[NCi,]  = c(N, self$TestFun(Rx))
+      Rx_best               = matrix(c(self$RecX[[N]]$best_X, 0), nrow=1)
+      Rx_slow               = matrix(c(self$RecX[[N]]$slow_best_X, 0), nrow=1)
+      NCi                   = nrow(self$Cost)+1
+      self$Cost[NCi,]  = c(N, self$TestFun(Rx_best), self$TestFun(Rx_slow))
     },
-#
+
+    update_pred_Y = function(){
+      if(length(self$Y_pred)!= length(self$Y)){
+        self$Y_pred = shrinking_ball_regression(self$X, self$X, self$Y, self$r_series, self$lb, self$ub)
+      }
+    },
+
     base_optimize = function(Budget0=20, Budget=500, get_next_x=NULL, learn_kernel=NULL, Ns0=5){
       
       
@@ -394,9 +420,9 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
       t0       = proc.time()[3]
       
       cat("\nSelecting points 1,...,", Budget0, "\n")
+
       # get first initilialization points
-      X_init   = UniformDesign_X(N0=Budget0, ran=self$ran, Ns=Ns0, 
-                                  TestFun=NULL, rounding=self$rounding, double=0) 
+      X_init = ( self$ran[1, ] + self$ran[2, ] ) * 0.5
       KG_time = proc.time()[3] - t0
       
       # get objective function values
@@ -404,10 +430,10 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
       eval_time = proc.time()[3] - t0 - KG_time
       
       # fit the model
-      self$GP = CRNLHood$new(X_init, Y_init, self$ran)
-      self$GP$Refresh(learnHpars = kk)
+      self$X = X_init
+      self$Y = Y_init
+      self$update_pred_Y()
       fit_time = proc.time()[3] - t0 - KG_time - eval_time
-      
       
       self$UpdateLogs(KG_time, eval_time, fit_time)
       
@@ -416,9 +442,9 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
         
 
       # Now do the sequential bit!
-      while (length(self$GP$yd)<Budget){
+      while (length(self$Y)<Budget){
 
-        N =  length(self$GP$yd)+1
+        N =  length(self$Y)+1
         cat("Selecting point: ",N, "\n")
         t0 = proc.time()[3]
         
@@ -434,10 +460,8 @@ SOSA = R6Class("SOSA",inherit = OptimizerBase,
         
         
         # Update the data and either do a full hpar update or just finetune
-        self$GP$xd      = rbind(self$GP$xd, newx)
-        self$GP$yd_o   = c(self$GP$yd_o, newy)
-        finetune        = !(N%in%OptimSteps)
-        self$GP$Refresh(learnHpars = kk + finetune)
+        self$X      = rbind(self$X, newx)
+        self$Y      = c(self$Y, newy)
         fit_time        = proc.time()[3] - t0 - eval_time - KG_time
         
         self$UpdateLogs(KG_time, eval_time, fit_time)
