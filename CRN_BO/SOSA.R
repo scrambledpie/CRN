@@ -482,9 +482,58 @@ SOSA = R6Class("SOSA",
         fit_time    = proc.time()[3] - t0 - eval_time - KG_time
         
         self$UpdateLogs(KG_time, eval_time, fit_time)
+
+        if(length(self$Y)%%10 == 0) self$Checkpoint()
         
       }
+
+      self$Checkpoint()
       
+    },
+
+    Checkpoint = function(tryload=F){
+
+      if(!is.null(self$myID)){
+        
+        myID = self$myID
+        
+        cat("\nCheckpoint, ")
+        
+        loadstate = function(){
+          stop("There is nothing to load?!?!")
+        }
+        
+        SaveState = function(){
+          
+          cat("saving file ...", paste("res/", myID, sep=""))
+          Output = list(CPU    = system("hostname", intern=T),
+                        Cost   = self$Cost,
+                        method = self$method, 
+                        seed   = self$BOseed, 
+                        x      = self$X, 
+                        y      = self$Y,
+                        myID   = self$myID,
+                        RecX   = self$RecX,
+                        Timing = self$Timing,
+                        .Random.seed = .Random.seed,
+                        methodname = class(self)[1]
+          )
+          saveRDS(Output,paste("res/", myID, sep=""))
+          cat(" done\n")
+        }
+        
+        
+        if(tryload){
+          if(file.exists(paste("res/", myID, sep=""))){
+            loadsuccess = T
+            tryCatch(LoadState(),error=function(e){cat("Failed to load"); loadsuccess=F; return(F)})
+          }
+        }else{
+          SaveState()
+        }
+  
+  
+      }
     }
   )
 )
@@ -492,7 +541,7 @@ SOSA = R6Class("SOSA",
 
 
 
-if(1==1){
+if(1==11){
   # RUNNING ON ATO FOR TESTING
   problem  = 2
   BOseed   = 1
@@ -514,4 +563,6 @@ if(1==1){
   Optimizer = SOSA$new(TestFun, ran, BOseed, myID=filename, rounding=T)
 
   Optimizer$optimize(Budget=Budget)
+
+  saveRDS()
 }
