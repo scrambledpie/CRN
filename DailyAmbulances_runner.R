@@ -23,7 +23,7 @@ if(!debug){
   # setwd(wd1)
   # cat("changed dir to: ", getwd(),"\n\n")
   
-  reps = 400
+  reps = 800
   Methods = rep(c(10), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   
@@ -53,7 +53,7 @@ if(!debug){
   method   = 10
   BOseed   = 1
   Ns0      = 5
-  Budget   = 50
+  Budget   = 1000
   filename = NULL
 }
 

@@ -10,4 +10,4 @@ if __name__ == '__main__':
 
 
     for name in CSC_NAMES:
-        callbash("ssh " + name + " 'killall python'&")
+        callbash("ssh " + name + " 'killall R'&")
