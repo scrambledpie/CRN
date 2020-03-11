@@ -6,11 +6,22 @@ debug = length(Args)==0
 
 if(!length(Args)%in%c(0,2))stop("Give a jobID and Budget>20 as arguments")
 
+
+
 if(!debug){
   
   # Running from terminal
   cat(CPU,"\n\n", commandArgs(), "\n\n")
-  cat(getwd(),"\n\n")
+
+
+  cat("current dir: ", getwd(),"\n")
+
+  # wd0 = getwd()
+  # wd0_split = strsplit(wd0, "/")[[1]]
+  # dirs = length(wd0_split) - 1
+  # wd1 = paste(wd0_split[1:dirs], collapse="/")
+  # setwd(wd1)
+  # cat("changed dir to: ", getwd(),"\n\n")
   
   reps = 400
   Methods = rep(c(2, 4, 5, 6, 7), each=reps)
@@ -37,7 +48,7 @@ if(!debug){
   if (grepl("pearce", CPU)) setwd("/Users/pearce/CRN/")
   
   # Optimization Run
-  method   = 7
+  method   = 10
   BOseed   = 1
   Ns0      = 5
   Budget   = 500
@@ -53,6 +64,7 @@ ran = attr(TestFun, 'ran')
 
 # pick the algortihm from the list
 source('CRN_BO/Optimizers.R')
+source('CRN_BO/SOSA.R')
 ALGORITHMS = c(1,
                BO_KG,
                1,
@@ -61,7 +73,8 @@ ALGORITHMS = c(1,
                BO_CRNKG_CSW,
                BO_PWKG_CSW,
                BO_CRNKG_CS_allseeds,
-               BO_CRNKG_CSW_allseeds)
+               BO_CRNKG_CSW_allseeds,
+               SOSA)
 
 AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
 
