@@ -28,9 +28,11 @@ if(!debug){
   BOseeds  = rep(1:reps, len=length(Methods))
   
   dirname = Args[1]
-  set.seed(1)
-  JOBS = sample(length(Methods))
-  myID = JOBS[as.numeric(Args[2])]
+  # set.seed(1)
+  # JOBS = sample(length(Methods))
+  # myID = JOBS[as.numeric(Args[2])]
+
+  myID = as.numeric(Args[2])
 
   
   # Optimization Run
