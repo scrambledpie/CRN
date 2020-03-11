@@ -505,7 +505,7 @@ SOSA = R6Class("SOSA",
         
         SaveState = function(){
           
-          cat("saving file ...", paste("res/", myID, sep=""))
+          cat("saving file ...", paste("../res/", myID, sep=""))
           Output = list(CPU    = system("hostname", intern=T),
                         Cost   = self$Cost,
                         method = self$method, 
@@ -518,13 +518,13 @@ SOSA = R6Class("SOSA",
                         .Random.seed = .Random.seed,
                         methodname = class(self)[1]
           )
-          saveRDS(Output,paste("res/", myID, sep=""))
+          saveRDS(Output,paste("../res/", myID, sep=""))
           cat(" done\n")
         }
         
         
         if(tryload){
-          if(file.exists(paste("res/", myID, sep=""))){
+          if(file.exists(paste("../res/", myID, sep=""))){
             loadsuccess = T
             tryCatch(LoadState(),error=function(e){cat("Failed to load"); loadsuccess=F; return(F)})
           }

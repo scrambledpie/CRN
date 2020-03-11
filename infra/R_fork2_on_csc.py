@@ -55,7 +55,7 @@ if __name__ == "__main__":
     script_path = os.path.join(args.dirname, 'src') 
     # script_file = os.path.join('scripts', args.exp_script.split('/')[-1])
     script_file = args.exp_script.split('/')[-1]
-    command_prefix = "source $HOME/.bashrc; cd " + script_path + "; nice -n 10 Rscript " + script_file + " " + args.dirname + " "
+    command_prefix = "source /etc/profile; source $HOME/.bashrc; cd " + script_path + "; nice -n 10 Rscript " + script_file + " " + args.dirname + " "
 
     if args.k is not None:
         # run all the jobs!
