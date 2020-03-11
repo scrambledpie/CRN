@@ -27,15 +27,17 @@ if(!debug){
   Methods = rep(c(10), each=reps)
   BOseeds  = rep(1:reps, len=length(Methods))
   
+  dirname = Args[1]
   set.seed(1)
   JOBS = sample(length(Methods))
-  myID = JOBS[as.numeric(Args[1])] 
+  myID = JOBS[as.numeric(Args[2])]
+
   
   # Optimization Run
   method = Methods[myID]
   BOseed = BOseeds[myID]
   Ns0    = 5
-  Budget = as.integer(Args[2])
+  Budget = 50
   filename = paste(c(myID, "AMB", method, BOseed), collapse = "_")
   
 }else{
@@ -51,7 +53,7 @@ if(!debug){
   method   = 10
   BOseed   = 1
   Ns0      = 5
-  Budget   = 500
+  Budget   = 50
   filename = NULL
 }
 
