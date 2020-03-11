@@ -302,7 +302,6 @@ Build_Xie_ATO_cpp_Testfun = function(baseseed=1, numtestseeds=2000, runlength=1)
   simcalls = 0
   
   TestFun_i = function(xs){
-    print(xs)
     if(xs[9]==0){
       RV = TestStreams
     }else{

@@ -413,7 +413,7 @@ SOSA = R6Class("SOSA",
       NCi                   = nrow(self$Cost) + 1
 
       # cat("Rx_best: ", Rx_best, ",  Rx_slow: ", Rx_slow, "\n")
-
+      cat("\nTesting")
       self$Cost[NCi,]  = c(N, self$TestFun(Rx_best), self$TestFun(Rx_slow))
     },
 
@@ -424,9 +424,6 @@ SOSA = R6Class("SOSA",
       if(length(self$Y_pred)!= length(self$Y)){
         dims = ncol(self$X) - 1
         X_train = self$X[ , 1:dims, drop=F]
-
-
-        print(dim(X_train))
         self$Y_pred = shrinking_ball_regression(X_train, X_train, self$Y, self$r_series, self$lb, self$ub)
       }
     },
@@ -463,14 +460,14 @@ SOSA = R6Class("SOSA",
 
         N =  length(self$Y)+1
         
-        cat("Selecting point: ",N, "\n")
+        cat("\n\nSelecting point: ",N, "\n")
         t0 = proc.time()[3]
         
         # Get the new x to evaluate
         new_x = self$get_next_x()
         if(self$rounding) new_x = round(new_x)
 
-        cat("new x is: ", new_x, "\n")
+        cat("new x is: ", new_x, ", ")
         KG_time = proc.time()[3] - t0
         
         
@@ -497,7 +494,7 @@ SOSA = R6Class("SOSA",
 
 if(1==1){
   # RUNNING ON ATO FOR TESTING
-  problem  = 1
+  problem  = 2
   BOseed   = 1
   Budget   = 25
   filename = "debug_SOSA" # where to save results
