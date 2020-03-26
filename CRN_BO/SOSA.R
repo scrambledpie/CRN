@@ -343,6 +343,7 @@ SOSA = R6Class("SOSA",
       #   beta: radius decay exponent
       #   s: recomendation time sequence shrinkage
 
+      self$method = 10
       self$TestFun = TestFun
       self$ran = ran
       self$rounding = rounding

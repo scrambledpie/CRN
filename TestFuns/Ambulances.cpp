@@ -263,8 +263,8 @@ NumericVector Ambulances_Square_timed(NumericMatrix bases,
       // No ambulance available, so let's get the quickest one!
       NumLate +=1;
       
-      depart = min(Ambulances(_,0));
-      closestA = which_min(Ambulances(_,0));
+      depart = min(Ambulances(_, 0));
+      closestA = which_min(Ambulances(_, 0));
       
       xlc = Ambulances(closestA, 1);
       ylc = Ambulances(closestA, 2);

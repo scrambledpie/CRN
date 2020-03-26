@@ -228,5 +228,5 @@ if __name__ == '__main__':
     # This will not run if there are no arguments
     print("Calling all CSC machines! Your country needs you!   Over to ..... " + args.first_fork, "\n\n")
     callbash(
-        f"ssh {args.first_fork} 'source /etc/profile; source ~/.bashrc; conda activate {args.conda}; cd ~/forkinghellpython/; python R_fork1_on_csc.py " + \
+        f"ssh {args.first_fork} 'source ~/.bashrc; conda activate {args.conda}; cd ~/forkinghellpython/; python R_fork1_on_csc.py " + \
         args.exp_script + " " + str(args.exp_num) + " --basedir " + args.basedir + vflag + "'&")

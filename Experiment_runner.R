@@ -3,7 +3,7 @@ cat("Running locally \n")
 
 
 # Optimization Run
-method   = 5 # see list of optimizers below
+method   = 10 # see list of optimizers below
 problem  = 1 # the test function to use, see list below
 BOseed   = 1 # the starting seed for the test problem
 Ns0      = 5 # number of seeds to start the optimizer
@@ -31,12 +31,14 @@ ALGORITHMS = c(BO_KG,                   # normal Knowledge Gradient (KG)
                BO_PWKG_CSW,             # PW-KG with full noise model
                BO_CRNKG_CS_allseeds,    # KG-CRN with CS model, acq fun is optimized for each seed (slow)
                BO_CRNKG_CSW_allseeds,   # KG-CRN with full model, acq fun is optimized for each seed (slow)
-               SOSA)   # SOSA, the algrotihms proposed by 
+               NULL,
+               NULL,
+               SOSA)   # SOSA, the algrotihms proposed by the reviewer
 
 Optim_class = ALGORITHMS[[method]]
 
 
-# initialise the optimizer object
+# initialise the optimizer objective
 Optimizer = Optim_class$new(TestFun, ran, BOseed, myID=filename, rounding=T)
 
 

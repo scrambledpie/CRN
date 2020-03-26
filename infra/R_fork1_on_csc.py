@@ -139,7 +139,7 @@ def run(args):
 
         # call each machine and allocate it some jobs
         # command: python fork_again_on_csc.py (/cscstorage/script.py) (new dirname) (sub list of jobs)
-        cmd = "ssh " + name + " 'source /etc/profile; source $HOME/.bashrc; conda activate "+ conda_env+"; python ~/forkinghellpython/R_fork2_on_csc.py " + \
+        cmd = "ssh " + name + " 'source $HOME/.bashrc; conda activate "+ conda_env+"; python ~/forkinghellpython/R_fork2_on_csc.py " + \
                  args.exp_script + " " + dirname + " " + " ".join(fork_args) + vflag + "'&"
         # print(cmd)
         callbash(cmd)
