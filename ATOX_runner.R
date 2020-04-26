@@ -39,7 +39,7 @@ if(!debug){
   method = Methods[myID]
   BOseed = BOseeds[myID]
   Ns0    = 3
-  Budget = 25
+  Budget = 500
   filename = paste(c(myID, "ATO", method, BOseed), collapse = "_")
   
 }else{
