@@ -86,7 +86,7 @@ ALGORITHMS = c(1,
 
 for(jj in ls()){cat(jj, "\n")}
 
-AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
+AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=T, Ns0=Ns0)
 
 
 
