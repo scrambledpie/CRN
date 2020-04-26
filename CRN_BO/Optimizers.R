@@ -75,8 +75,8 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
         
         LoadState = function(){
           # get the file
-          cat("loading file ", paste("EachData1/", myID, sep=""), "....")
-          Input = readRDS(paste("EachData1/", myID, sep=""))
+          cat("loading file ", paste("../res/", myID, sep=""), "....")
+          Input = readRDS(paste("../res/", myID, sep=""))
           
           # now copy everything over!
           self$Cost    <<- Input$Cost
@@ -98,7 +98,7 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
         
         SaveState = function(){
           
-          cat("saving file ...", paste("EachData1/", myID, sep=""))
+          cat("saving file ...", paste("../res/", myID, sep=""))
           Output = list(CPU    = system("hostname",intern=T),
                         Cost   = self$Cost,
                         method = self$method, 
@@ -114,13 +114,13 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
                         .Random.seed = .Random.seed,
                         methodname = class(self)[1]
           )
-          saveRDS(Output,paste("EachData1/", myID, sep=""))
+          saveRDS(Output,paste("../res/", myID, sep=""))
           cat(" done\n")
         }
         
         
         if(tryload){
-          if(file.exists(paste("EachData1/", myID, sep=""))){
+          if(file.exists(paste("../res/", myID, sep=""))){
             loadsuccess = T
             tryCatch(LoadState(),error=function(e){cat("Failed to load"); loadsuccess=F; return(F)})
           }

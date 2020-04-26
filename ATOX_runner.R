@@ -84,6 +84,8 @@ ALGORITHMS = c(1,
                BO_CRNKG_CSW_allseeds,
                SOSA)
 
+for(jj in ls()){cat(jj, "\n")}
+
 AA = ALGORITHMS[[method]]$new(TestFun, ran, BOseed, myID=filename, rounding=F)
 
 
