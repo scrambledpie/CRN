@@ -3,7 +3,6 @@
 library(MASS)
 library(R6)
 library(FastGP)
-library(R6)
 
 source('CRN_BO/utils.R')
 
