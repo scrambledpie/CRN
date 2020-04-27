@@ -38,7 +38,7 @@ if(!debug){
   # Optimization Run
   method = Methods[myID]
   BOseed = BOseeds[myID]
-  Ns0    = 8
+  Ns0    = 5
   Budget = 500
   filename = paste(c(myID, "ATO", method, BOseed), collapse = "_")
   
