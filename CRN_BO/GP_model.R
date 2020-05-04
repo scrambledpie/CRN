@@ -649,7 +649,7 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     
   },
   
-  Unique_seeds_Optimise   = function(with_prior=T){
+  Unique_seeds_Optimise   = function(with_prior=F){
     
     
     LFUNS = LhoodBuilder(self$xd[,1:self$dims], self$yd, with_prior=with_prior, XRAN = self$XRAN)
@@ -1180,7 +1180,13 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     
   },
   
-  Refresh = function(Hpars=NULL, Ns=5, learnHpars=0, with_prior=T, ymean=NULL){
+  Refresh = function(Hpars=NULL, Ns=5, learnHpars=0, with_prior=F, ymean=NULL){
+    
+    stopifnot(
+      nrow(self$xd)>0,
+      ncol(self$xd)==self$dims+1,
+      nrow(self$xd)==length(self$yd_o)
+    )
     
     if(self$copula){
       self$yd    = qnorm( order(self$yd_o)/(length(self$yd_o)+1) )
@@ -1259,6 +1265,8 @@ CRNLHood = R6Class("LhoodOptimizer",public = list(
     
     self$iK  = rcppeigen_invert_matrix( self$kernel(self$xd,self$xd) )
     self$iKY = self$iK%*%self$ydm
+    
+    # browser()
     self$Hpar_History[[length(self$yd)]] = self$HP
     
   },
