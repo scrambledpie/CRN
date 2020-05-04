@@ -118,7 +118,7 @@ restore_data_perform_CV = function(data){
 # restore results data from this run
 res_dir = "/home/maths/phrnaj/RESULTS/CRN/181.phrnaj.2020-04-27.22:36:24.265b316/res/"
 res_files = dir(res_dir)
-res_data = readRDS(res_files[myID])
+res_data = readRDS(paste(res_dir, res_files[myID], sep=""))
 
 CV_results = restore_data_perform_CV(res_Data)
 
