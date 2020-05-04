@@ -71,6 +71,7 @@ restore_data_perform_CV = function(data){
     Y0 = data$y
     HP0 = data$Hpars[[length(data$Hpars)]]
     cat("\nGot the dataset\n\n")
+    ran = rbind(rep(0,8), rep(20,8)) # ATO!!!
 
     # learnHpars dictates what type of GP model we learn
     # 0: keep previous hyperparameters
