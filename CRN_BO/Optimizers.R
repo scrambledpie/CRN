@@ -75,8 +75,8 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
         
         LoadState = function(){
           # get the file
-          cat("loading file ", paste("EachData1/", myID, sep=""), "....")
-          Input = readRDS(paste("EachData1/", myID, sep=""))
+          cat("loading file ", paste("../res/", myID, sep=""), "....")
+          Input = readRDS(paste("../res/", myID, sep=""))
           
           # now copy everything over!
           self$Cost    <<- Input$Cost
@@ -98,7 +98,7 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
         
         SaveState = function(){
           
-          cat("saving file ...", paste("EachData1/", myID, sep=""))
+          cat("saving file ...", paste("../res/", myID, sep=""))
           Output = list(CPU    = system("hostname",intern=T),
                         Cost   = self$Cost,
                         method = self$method, 
@@ -114,13 +114,13 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
                         .Random.seed = .Random.seed,
                         methodname = class(self)[1]
           )
-          saveRDS(Output,paste("EachData1/", myID, sep=""))
+          saveRDS(Output,paste("../res/", myID, sep=""))
           cat(" done\n")
         }
         
         
         if(tryload){
-          if(file.exists(paste("EachData1/", myID, sep=""))){
+          if(file.exists(paste("../res/", myID, sep=""))){
             loadsuccess = T
             tryCatch(LoadState(),error=function(e){cat("Failed to load"); loadsuccess=F; return(F)})
           }
@@ -130,7 +130,7 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
       }
       return(loadsuccess)
     },
-    base_optimize = function(Budget0=20, Budget=500, get_next_x=NULL, learn_kernel=NULL, Ns0=5){
+    base_optimize = function(Budget0=20, Budget=500, get_next_x=NULL, learn_kernel=NULL){
       
       
       if(is.null(get_next_x))stop("provide a get_next_x() function!")
@@ -152,7 +152,7 @@ BO_base = R6Class("BO_base",inherit = OptimizerBase,
         
         cat("\nSelecting points 1,...,", Budget0, "\n")
         # get first initilialization points
-        X_init   = UniformDesign_X(N0=Budget0, ran=self$ran, Ns=Ns0, 
+        X_init   = UniformDesign_X(N0=Budget0, ran=self$ran, Ns=self$Ns0, 
                                    TestFun=NULL, rounding=self$rounding, double=0) 
         KG_time = proc.time()[3] - t0
         

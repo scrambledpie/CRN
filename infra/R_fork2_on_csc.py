@@ -4,7 +4,7 @@ import os
 import socket
 import subprocess as sp
 
-from fork0_to_csc import N_PROCESSES, callbash, get_hostname
+from R_fork0_to_csc import N_PROCESSES, callbash, get_hostname
 
 cpu = get_hostname()
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     script_path = os.path.join(args.dirname, 'src') 
     # script_file = os.path.join('scripts', args.exp_script.split('/')[-1])
     script_file = args.exp_script.split('/')[-1]
-    command_prefix = "source $HOME/.bashrc; cd " + script_path + "; nice -n 10 Rscript " + script_file + " " + args.dirname + " "
+    command_prefix = "source $HOME/.bashrc > /dev/null; cd " + script_path + "; nice -n 10 Rscript " + script_file + " " + args.dirname + " "
 
     if args.k is not None:
         # run all the jobs!

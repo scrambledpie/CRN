@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 from datetime import datetime
 import os
-from fork0_to_csc import CSC_NAMES, callbash, get_hostname
+from R_fork0_to_csc import CSC_NAMES, callbash, get_hostname
 import shutil
 
 home = sp.check_output(['echo $HOME'], shell=True).decode()[:-1]
@@ -139,7 +139,7 @@ def run(args):
 
         # call each machine and allocate it some jobs
         # command: python fork_again_on_csc.py (/cscstorage/script.py) (new dirname) (sub list of jobs)
-        cmd = "ssh " + name + " 'source $HOME/.bashrc; conda activate "+ conda_env+"; python ~/forkinghellpython/R_fork2_on_csc.py " + \
+        cmd = "ssh " + name + " 'source $HOME/.bashrc > /dev/null; conda activate "+ conda_env+"; python ~/forkinghellpython/R_fork2_on_csc.py " + \
                  args.exp_script + " " + dirname + " " + " ".join(fork_args) + vflag + "'&"
         # print(cmd)
         callbash(cmd)
