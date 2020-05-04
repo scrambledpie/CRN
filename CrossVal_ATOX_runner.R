@@ -120,7 +120,7 @@ res_dir = "/home/maths/phrnaj/RESULTS/CRN/181.phrnaj.2020-04-27.22:36:24.265b316
 res_files = dir(res_dir)
 res_data = readRDS(paste(res_dir, res_files[myID], sep=""))
 
-CV_results = restore_data_perform_CV(res_Data)
+CV_results = restore_data_perform_CV(res_data)
 
 saveRDS(CV_results, filename)
 cat("\n Finished and Saved", myID)
