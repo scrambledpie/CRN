@@ -33,7 +33,7 @@ Cross_validate = function(GP){
   # keeps the hyperparameters, removes one data points at a time and 
   # compute the delta to the missing point.
   
-  n = length(GP$yd)
+  n = 5 #length(GP$yd)
   
   full_X = GP$xd
   full_Y = GP$yd
