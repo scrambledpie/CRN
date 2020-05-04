@@ -123,6 +123,8 @@ res_data = readRDS(paste(res_dir, res_files[myID], sep=""))
 
 CV_results = restore_data_perform_CV(res_data)
 
+filename = paste("../res/", filename, sep="")
+
 saveRDS(CV_results, filename)
-cat("\n Finished and Saved", myID)
+cat("\n Finished and Saved", filename)
 
