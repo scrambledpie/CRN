@@ -21,7 +21,7 @@ cat(CPU,"\n\n", commandArgs(), "\n\n")
 cat("current dir: ", getwd(),"\n")
 
 # parse arguments
-myID = as.numeric(Args[1]) + 1
+myID = as.numeric(Args[2]) + 1
 if (is.na(myID)){myID = 1}
 
 # restore results data from this run
