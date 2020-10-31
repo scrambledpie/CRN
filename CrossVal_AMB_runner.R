@@ -25,8 +25,11 @@ myID = as.numeric(Args[2]) + 1
 if (is.na(myID)){myID = 1}
 
 # restore results data from this run
-# res_dir = "/home/maths/phrnaj/RESULTS/CRN/res_8001/"
-res_dir = "/home/michael/Desktop/res_8001/"
+if (CPU == "asus"){
+  res_dir = "/home/michael/Desktop/res_8001/"
+}else{
+  res_dir = "/home/maths/phrnaj/RESULTS/CRN/res_8001/"
+}
 res_files = dir(res_dir)
 res_data = readRDS(paste(res_dir, res_files[myID], sep=""))
 
