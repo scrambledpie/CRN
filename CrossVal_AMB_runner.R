@@ -117,8 +117,7 @@ restore_data_perform_CV = function(data){
   return(list(IID_CV=IA_CV, OFF_CV=OA_CV, WIG_CV=WA_CV))
   
 }
-# CV_results = restore_data_perform_CV(res_data)
-CV_results = 1:10
+CV_results = restore_data_perform_CV(res_data)
 
 # save output
 filename = paste("../res/", myID, sep="")
