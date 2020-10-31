@@ -21,11 +21,12 @@ cat(CPU,"\n\n", commandArgs(), "\n\n")
 cat("current dir: ", getwd(),"\n")
 
 # parse arguments
-dirname = Args[1]
-myID = as.numeric(Args[2]) + 1
+myID = as.numeric(Args[1]) + 1
+if (is.na(myID)){myID = 1}
 
 # restore results data from this run
-res_dir = "/home/maths/phrnaj/RESULTS/CRN/res_8001/"
+# res_dir = "/home/maths/phrnaj/RESULTS/CRN/res_8001/"
+res_dir = "/home/michael/Desktop/res_8001/"
 res_files = dir(res_dir)
 res_data = readRDS(paste(res_dir, res_files[myID], sep=""))
 
@@ -71,7 +72,7 @@ restore_data_perform_CV = function(data){
   Y0 = data$y
   HP0 = data$Hpars[[length(data$Hpars)]]
   cat("\nGot the dataset\n\n")
-  ran = rbind(rep(0,8), rep(20,8)) # ATO!!!
+  ran = rbind(rep(0, 6), rep(30, 6)) # AMB!!!
   
   # learnHpars dictates what type of GP model we learn
   # 0: keep previous hyperparameters
@@ -86,9 +87,9 @@ restore_data_perform_CV = function(data){
   
   # IID MODEL FIRST
   HP_IID = HP0
-  HP_IID[18] = 0 #  wiggles
-  HP_IID[19] = 0 #  offset
-  HP_IID[20] = HP0[18] + HP0[19] + HP0[20] # white noise
+  HP_IID[14] = 0 #  wiggles
+  HP_IID[15] = 0 #  offset
+  HP_IID[16] = HP0[14] + HP0[15] + HP0[16] # white noise
   IA_GP = CRNLHood$new(X0, Y0, ran)
   IA_GP$Refresh(learnHpars = 7, Hpars=HP_IID); cat("\nMade the IID model\n\n")
   IA_CV = Cross_validate(IA_GP); cat("got the CV for IID\n\n\n")
@@ -96,9 +97,9 @@ restore_data_perform_CV = function(data){
   
   # OFFSETS MODEL
   HP_OFF = HP0
-  HP_OFF[18] = 0 #  wiggles
-  HP_OFF[19] = 0.5*HP0[18] + HP0[19] #  offset
-  HP_OFF[20] = 0.5*HP0[18] + HP0[20] # white noise
+  HP_OFF[14] = 0 #  wiggles
+  HP_OFF[15] = 0.5*HP0[14] + HP0[15] #  offset
+  HP_OFF[16] = 0.5*HP0[14] + HP0[16] # white noise
   OA_GP = CRNLHood$new(X0, Y0, ran)
   OA_GP$HP = HP_OFF
   OA_GP$Refresh(learnHpars = 1); cat("\nMade the OFF model\n\n")
