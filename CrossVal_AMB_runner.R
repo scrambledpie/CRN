@@ -120,7 +120,7 @@ restore_data_perform_CV = function(data){
 CV_results = restore_data_perform_CV(res_data)
 
 # save output
-filename = paste("../res/", filename, sep="")
+filename = paste("../res/", myID, sep="")
 saveRDS(CV_results, filename)
 cat("\n Finished and Saved", filename)
 
