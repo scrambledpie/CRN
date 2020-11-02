@@ -25,10 +25,13 @@ myID = as.numeric(Args[2]) + 1
 if (is.na(myID)){myID = 1}
 
 # restore results data from this run
+# 8001 : ambulance fixed time
+# 8002 : ambulance sum patients
+# 6003 : ambulance fixed patient number
 if (CPU == "asus"){
   res_dir = "/home/michael/Desktop/res_8002/"
 }else{
-  res_dir = "/home/maths/phrnaj/RESULTS/CRN/res_8002/"
+  res_dir = "/home/maths/phrnaj/RESULTS/CRN/res_6003/"
 }
 res_files = dir(res_dir)
 res_data = readRDS(paste(res_dir, res_files[myID], sep=""))
