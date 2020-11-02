@@ -26,9 +26,9 @@ if (is.na(myID)){myID = 1}
 
 # restore results data from this run
 if (CPU == "asus"){
-  res_dir = "/home/michael/Desktop/res_8001/"
+  res_dir = "/home/michael/Desktop/res_8002/"
 }else{
-  res_dir = "/home/maths/phrnaj/RESULTS/CRN/res_8001/"
+  res_dir = "/home/maths/phrnaj/RESULTS/CRN/res_8002/"
 }
 res_files = dir(res_dir)
 res_data = readRDS(paste(res_dir, res_files[myID], sep=""))
