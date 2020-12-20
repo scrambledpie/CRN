@@ -1,6 +1,5 @@
 library(R6)
 
-
 Kernel_regression = function(X_test, X_train, Y_train, r, lb, ub){
     # Makes predictions of output at X_test using top-hat kernel
     #
@@ -358,7 +357,7 @@ SOSA = R6Class("SOSA",
       self$r_series = r0 * ((0:2000) ^ -beta)
       self$gamma = gamma
       self$s = s
-      self$i_n_series = floor( 0:2000 ^ s )
+      self$i_n_series = floor( (0:2000) ^ s )
     },
 
     get_RecX = function(){
