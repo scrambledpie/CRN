@@ -1,6 +1,6 @@
 rm(list = ls())
 
-setwd("/Users/pearce/CRN/")
+# setwd("/Users/pearce/CRN/")
 
 source("CRN_BO/GP_model.R")
 source("CRN_BO/Acquisition_funs.R")
@@ -20,12 +20,12 @@ tester_gradients = function(f, df, x0, h=NULL, tol=0.01, msg){
   if(is.null(h)) h = min( 0.000001, min(abs(x0))/100)
   cat("\nTesting gradients ", msg, "\n")
   
-  f0 = f(x0)
-  
   ss = 1:length(x0)
   
-  emp_df = sapply(ss, function(i)f(x0+h*(i==ss)))
-  emp_df = (emp_df-f0)/h
+  df_hi = sapply(ss, function(i)f(x0+0.5*h*(i==ss))) 
+  df_lo = sapply(ss, function(i)f(x0-0.5*h*(i==ss))) 
+
+  emp_df = (df_hi - df_lo) / h
   
   df0 = df(x0)
   
